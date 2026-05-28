@@ -1,0 +1,250 @@
+// ─── Prisma Schema for Data Delivery Platform ───────────────────────────────
+// Google Drive → Customer AWS S3 via AssumeRole + rclone
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ── Users & Auth ──────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String
+  role         UserRole @default(OPERATOR)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  transfers Transfer[]
+  auditLogs AuditLog[]
+
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  OPERATOR
+}
+
+// ── Customer Configuration ────────────────────────────────────────────────────
+
+model Customer {
+  id            String    @id @default(uuid())
+  name          String
+  roleArn       String    @map("role_arn")
+  bucketName    String    @map("bucket_name")
+  region        String    @default("ap-south-1")
+  prefixPath    String    @default("") @map("prefix_path")
+  externalId    String?   @map("external_id")
+  isValidated   Boolean   @default(false) @map("is_validated")
+  lastValidated DateTime? @map("last_validated")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  transfers Transfer[]
+
+  @@map("customers")
+}
+
+// ── Google Drive Source ────────────────────────────────────────────────────────
+
+model GoogleDriveSource {
+  id            String         @id @default(uuid())
+  name          String
+  drivePath     String         @map("drive_path")
+  driveType     DriveType      @default(MY_DRIVE) @map("drive_type")
+  sharedDriveId String?        @map("shared_drive_id")
+  authType      GdriveAuthType @default(SERVICE_ACCOUNT) @map("auth_type")
+  clientId      String?        @map("client_id")
+  clientSecret  String?        @map("client_secret")
+  tokenJson     String?        @map("token_json")
+  createdAt     DateTime       @default(now()) @map("created_at")
+  updatedAt     DateTime       @updatedAt @map("updated_at")
+
+  transfers Transfer[]
+
+  @@map("google_drive_sources")
+}
+
+enum GdriveAuthType {
+  SERVICE_ACCOUNT
+  OAUTH
+}
+
+enum DriveType {
+  MY_DRIVE
+  SHARED_DRIVE
+}
+
+// ── Transfer Jobs ─────────────────────────────────────────────────────────────
+
+model Transfer {
+  id        String         @id @default(uuid())
+  name      String
+  direction TransferDirection @default(PUSH)
+  status    TransferStatus @default(QUEUED)
+  mode      TransferMode   @default(COPY)
+
+  // Source
+  sourceId String            @map("source_id")
+  source   GoogleDriveSource @relation(fields: [sourceId], references: [id])
+
+  // Destination
+  customerId      String @map("customer_id")
+  customer        Customer @relation(fields: [customerId], references: [id])
+  destinationPath String   @map("destination_path")
+
+  // Performance Settings
+  concurrency    Int     @default(32)
+  checkers       Int     @default(32)
+  retries        Int     @default(50)
+  bandwidthLimit String? @map("bandwidth_limit")
+
+  // Progress Tracking
+  totalBytes       BigInt @default(0) @map("total_bytes")
+  transferredBytes BigInt @default(0) @map("transferred_bytes")
+  totalFiles       Int    @default(0) @map("total_files")
+  transferredFiles Int    @default(0) @map("transferred_files")
+  failedFiles      Int    @default(0) @map("failed_files")
+  currentSpeed     String? @map("current_speed")
+  eta              String?
+  errorCount       Int    @default(0) @map("error_count")
+
+  // rclone Tracking
+  rcloneJobId Int?    @map("rclone_job_id")
+  rcloneGroup String? @map("rclone_group")
+
+  // Scheduling
+  scheduledAt    DateTime?     @map("scheduled_at")
+  scheduleType   ScheduleType? @map("schedule_type")
+  cronExpression String?       @map("cron_expression")
+
+  // Timestamps
+  startedAt   DateTime? @map("started_at")
+  completedAt DateTime? @map("completed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  createdById String @map("created_by_id")
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  logs      TransferLog[]
+  snapshots ProgressSnapshot[]
+
+  @@index([status])
+  @@index([createdAt])
+  @@map("transfers")
+}
+
+enum TransferDirection {
+  PUSH
+  PULL
+}
+
+enum TransferStatus {
+  QUEUED
+  RUNNING
+  PAUSED
+  COMPLETED
+  FAILED
+  CANCELLED
+  RETRYING
+  SCHEDULED
+}
+
+enum TransferMode {
+  COPY
+  SYNC
+  MOVE
+}
+
+enum ScheduleType {
+  ONE_TIME
+  DAILY
+  WEEKLY
+}
+
+// ── Progress Snapshots (time-series for charts) ───────────────────────────────
+
+model ProgressSnapshot {
+  id               String   @id @default(uuid())
+  transferId       String   @map("transfer_id")
+  transfer         Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  bytesTransferred BigInt   @map("bytes_transferred")
+  filesTransferred Int      @map("files_transferred")
+  speed            String
+  eta              String?
+  errorCount       Int      @default(0) @map("error_count")
+  timestamp        DateTime @default(now())
+
+  @@index([transferId, timestamp])
+  @@map("progress_snapshots")
+}
+
+// ── Transfer Logs ─────────────────────────────────────────────────────────────
+
+model TransferLog {
+  id         String   @id @default(uuid())
+  transferId String   @map("transfer_id")
+  transfer   Transfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  level      LogLevel
+  message    String
+  metadata   Json?
+  timestamp  DateTime @default(now())
+
+  @@index([transferId, timestamp])
+  @@index([level])
+  @@map("transfer_logs")
+}
+
+enum LogLevel {
+  INFO
+  WARN
+  ERROR
+}
+
+// ── Audit Logs ────────────────────────────────────────────────────────────────
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  user       User     @relation(fields: [userId], references: [id])
+  action     String
+  resource   String
+  resourceId String?  @map("resource_id")
+  details    Json?
+  ipAddress  String?  @map("ip_address")
+  timestamp  DateTime @default(now())
+
+  @@index([userId, timestamp])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ── Notification Settings ─────────────────────────────────────────────────────
+
+model NotificationSetting {
+  id        String              @id @default(uuid())
+  channel   NotificationChannel
+  config    Json
+  isActive  Boolean             @default(true) @map("is_active")
+  events    String[]
+  createdAt DateTime            @default(now()) @map("created_at")
+  updatedAt DateTime            @updatedAt @map("updated_at")
+
+  @@map("notification_settings")
+}
+
+enum NotificationChannel {
+  EMAIL
+  SLACK
+  TELEGRAM
+}

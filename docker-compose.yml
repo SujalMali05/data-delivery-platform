@@ -1,0 +1,61 @@
+version: '3.8'
+
+services:
+  # ── PostgreSQL Database ──────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: ddp-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ddp_user
+      POSTGRES_PASSWORD: ddp_secret_2024
+      POSTGRES_DB: data_delivery_platform
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ddp_user -d data_delivery_platform"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── Redis (Queue + Cache) ────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: ddp-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── rclone RC Daemon ─────────────────────────
+  rclone:
+    image: rclone/rclone:latest
+    container_name: ddp-rclone
+    restart: unless-stopped
+    ports:
+      - "5572:5572"
+    command: rcd --rc-addr=0.0.0.0:5572 --rc-no-auth --log-level=INFO --log-file=/logs/rclone.log
+    volumes:
+      - ./rclone-config:/config/rclone
+      - rclone_logs:/logs
+      - rclone_temp:/tmp/rclone
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:5572/core/version"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  rclone_logs:
+  rclone_temp:
