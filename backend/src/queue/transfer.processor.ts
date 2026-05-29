@@ -95,6 +95,37 @@ export class TransferProcessor extends WorkerHost {
             if (transfer.status !== 'RUNNING') {
               await this.updateTransferStatus(transferId, 'RUNNING');
             }
+
+            // Verify and recreate remotes if they were cleaned up or lost
+            const s3RemoteName = `s3-${transferId}`;
+            const gdriveRemoteName = `gdrive-${transferId}`;
+
+            const s3Exists = await this.rcloneService.remoteExists(s3RemoteName);
+            if (!s3Exists) {
+              this.logger.log(`Reconnecting: S3 remote ${s3RemoteName} is missing in rclone. Re-creating...`);
+              await this.rcloneConfig.createS3Remote(
+                transferId,
+                credentials,
+                transfer.customer.region,
+              );
+            }
+
+            const gdriveExists = await this.rcloneService.remoteExists(gdriveRemoteName);
+            if (!gdriveExists) {
+              this.logger.log(`Reconnecting: Google Drive remote ${gdriveRemoteName} is missing in rclone. Re-creating...`);
+              const sourceAuthType = transfer.source.authType || 'SERVICE_ACCOUNT';
+              await this.rcloneConfig.createGdriveRemote(transferId, {
+                serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
+                teamDriveId: transfer.source.sharedDriveId || undefined,
+                authType: sourceAuthType,
+                clientId: transfer.source.clientId || process.env.GOOGLE_OAUTH_CLIENT_ID || undefined,
+                clientSecret: transfer.source.clientSecret || process.env.GOOGLE_OAUTH_CLIENT_SECRET || undefined,
+                tokenJson: transfer.source.tokenJson || process.env.GOOGLE_OAUTH_TOKEN || undefined,
+              });
+            }
+
+            s3Remote = s3RemoteName;
+            gdriveRemote = gdriveRemoteName;
           } else {
             // On first attempt, prevent duplicate processing if already completed/cancelled
             if (attempts === 0 && (transfer.status === 'COMPLETED' || transfer.status === 'CANCELLED')) {

@@ -16,6 +16,19 @@ export class TransfersService implements OnApplicationBootstrap {
     @InjectQueue(TRANSFER_QUEUE) private readonly transferQueue: Queue,
   ) {}
 
+  private async addToQueueSafe(transferId: string) {
+    const activeJobs = await this.transferQueue.getJobs(['waiting', 'active', 'delayed']);
+    const isAlreadyQueued = activeJobs.some((job) => job.data?.transferId === transferId);
+
+    if (isAlreadyQueued) {
+      this.logger.log(`Transfer ${transferId} is already in wait/active queue. Skipping duplicate enqueue.`);
+      return;
+    }
+
+    await this.transferQueue.add(TRANSFER_JOB, { transferId });
+    this.logger.log(`Transfer ${transferId} added to execution queue.`);
+  }
+
   async onApplicationBootstrap() {
     this.logger.log('Initializing queue session on application bootstrap...');
     try {
@@ -37,9 +50,7 @@ export class TransfersService implements OnApplicationBootstrap {
             },
           });
           // Re-add to BullMQ queue so the worker resumes monitoring it
-          await this.transferQueue.add(TRANSFER_JOB, {
-            transferId: transfer.id,
-          });
+          await this.addToQueueSafe(transfer.id);
         } else {
           this.logger.log(`Transfer ${transfer.id} is marked RUNNING but no active background rclone job was found. Resetting to QUEUED...`);
           await this.prisma.transfer.update({
@@ -173,9 +184,7 @@ export class TransfersService implements OnApplicationBootstrap {
     // If not scheduled, handle launch mode
     if (!dto.scheduledAt) {
       if (launchMode === 'START') {
-        await this.transferQueue.add(TRANSFER_JOB, {
-          transferId: transfer.id,
-        });
+        await this.addToQueueSafe(transfer.id);
         this.logger.log(`Transfer started immediately: ${transfer.id}`);
       } else if (launchMode === 'QUEUE') {
         await this.processNextQueuedTransfer();
@@ -203,7 +212,7 @@ export class TransfersService implements OnApplicationBootstrap {
       data: { status: 'QUEUED' },
     });
 
-    await this.transferQueue.add(TRANSFER_JOB, { transferId: id });
+    await this.addToQueueSafe(id);
     this.logger.log(`Transfer started/resumed immediately: ${id}`);
 
     return { success: true, message: 'Transfer started immediately' };
@@ -247,10 +256,7 @@ export class TransfersService implements OnApplicationBootstrap {
       });
 
       if (nextTransfer) {
-        this.logger.log(`Starting next queued transfer: ${nextTransfer.name} (${nextTransfer.id})`);
-        await this.transferQueue.add(TRANSFER_JOB, {
-          transferId: nextTransfer.id,
-        });
+        await this.addToQueueSafe(nextTransfer.id);
       } else {
         this.logger.log('No queued transfers found.');
       }
@@ -322,7 +328,7 @@ export class TransfersService implements OnApplicationBootstrap {
       },
     });
 
-    await this.transferQueue.add(TRANSFER_JOB, { transferId: id });
+    await this.addToQueueSafe(id);
     this.logger.log(`Transfer retry queued: ${id}`);
 
     return { success: true, message: 'Transfer queued for retry' };

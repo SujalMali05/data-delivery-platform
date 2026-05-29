@@ -282,6 +282,18 @@ export class RcloneService {
   }
 
   /**
+   * Check if a remote exists in rclone config
+   */
+  async remoteExists(name: string): Promise<boolean> {
+    try {
+      await this.client.post('/config/get', { name });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Delete a remote
    */
   async deleteRemote(name: string): Promise<void> {

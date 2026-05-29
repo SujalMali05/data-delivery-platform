@@ -14,6 +14,19 @@ export class SchedulerService {
     @InjectQueue(TRANSFER_QUEUE) private readonly transferQueue: Queue,
   ) {}
 
+  private async addToQueueSafe(transferId: string) {
+    const activeJobs = await this.transferQueue.getJobs(['waiting', 'active', 'delayed']);
+    const isAlreadyQueued = activeJobs.some((job) => job.data?.transferId === transferId);
+
+    if (isAlreadyQueued) {
+      this.logger.log(`Transfer ${transferId} is already in wait/active queue. Skipping duplicate enqueue.`);
+      return;
+    }
+
+    await this.transferQueue.add(TRANSFER_JOB, { transferId });
+    this.logger.log(`Transfer ${transferId} added to execution queue from scheduler.`);
+  }
+
   /**
    * Check for scheduled transfers every minute
    */
@@ -38,9 +51,7 @@ export class SchedulerService {
         data: { status: 'QUEUED' },
       });
 
-      await this.transferQueue.add(TRANSFER_JOB, {
-        transferId: transfer.id,
-      });
+      await this.addToQueueSafe(transfer.id);
     }
 
     if (dueTransfers.length > 0) {
