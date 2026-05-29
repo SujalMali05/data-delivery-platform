@@ -21,6 +21,7 @@ const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
   { href: '/dashboard/transfers', label: 'Transfers', icon: ArrowLeftRight },
   { href: '/dashboard/calculator', label: 'Size Calculator', icon: Calculator },
+  { href: '/dashboard/s3-browser', label: 'S3 Browser', icon: Database },
   { href: '/dashboard/customers', label: 'Customers', icon: Users },
   { href: '/dashboard/gdrive', label: 'Google Drive', icon: HardDrive },
   { href: '/dashboard/schedules', label: 'Schedules', icon: CalendarClock },

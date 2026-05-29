@@ -86,4 +86,22 @@ export class CustomersController {
       body.path,
     );
   }
+
+  @Post('list-objects')
+  listObjects(
+    @Body()
+    body: {
+      customerId: string;
+      path?: string;
+      page?: number;
+      limit?: number;
+    },
+  ) {
+    return this.customersService.listObjects(
+      body.customerId,
+      body.path || '',
+      body.page || 1,
+      body.limit || 50,
+    );
+  }
 }

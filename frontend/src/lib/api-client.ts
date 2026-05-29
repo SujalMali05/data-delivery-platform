@@ -62,6 +62,8 @@ export const customersApi = {
     apiClient.post('/customers/browse', data),
   size: (data: { roleArn: string; bucketName: string; region: string; externalId?: string; path?: string }) =>
     apiClient.post('/customers/size', data),
+  listObjects: (data: { customerId: string; path?: string; page?: number; limit?: number }) =>
+    apiClient.post('/customers/list-objects', data),
 };
 
 // Google Drive

@@ -255,4 +255,83 @@ export class CustomersService {
       }
     }
   }
+
+  /**
+   * List both folders and files inside an S3 bucket path, sorted and paginated
+   */
+  async listObjects(
+    customerId: string,
+    path: string = '',
+    page: number = 1,
+    limit: number = 50,
+  ) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    const tempJobId = `list-objs-${Date.now()}`;
+    let remoteName = '';
+
+    try {
+      const credentials = await this.stsService.assumeRole(
+        customer.roleArn,
+        customer.externalId || undefined,
+      );
+
+      remoteName = await this.rcloneConfig.createS3Remote(
+        tempJobId,
+        credentials,
+        customer.region,
+      );
+
+      // Format rclone list path: remoteName:bucket/path
+      const rclonePath = `${customer.bucketName}/${path || ''}`.replace(/\/$/, '');
+      const response = await this.rcloneService.listDirectory(`${remoteName}:`, rclonePath);
+
+      const list = response.list || [];
+      
+      const mappedList = list.map((item: any) => {
+        const relativePath = item.Path.startsWith(customer.bucketName + '/')
+          ? item.Path.substring(customer.bucketName.length + 1)
+          : item.Path;
+        return {
+          name: item.Name,
+          path: relativePath,
+          isDir: item.IsDir,
+          size: item.Size || 0,
+          modTime: item.ModTime || null,
+        };
+      });
+
+      // Sort: Directories first, then files alphabetically
+      mappedList.sort((a: any, b: any) => {
+        if (a.isDir !== b.isDir) {
+          return a.isDir ? -1 : 1;
+        }
+        return a.name.localeCompare(b.name);
+      });
+
+      const total = mappedList.length;
+      const startIndex = (page - 1) * limit;
+      const endIndex = page * limit;
+      const items = mappedList.slice(startIndex, endIndex);
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+      };
+    } catch (error: any) {
+      this.logger.error(`Error listing S3 objects: ${error.message}`);
+      throw new Error(`Failed to list S3 objects: ${error.message}`);
+    } finally {
+      if (remoteName) {
+        await this.rcloneConfig.cleanupRemotes(tempJobId);
+      }
+    }
+  }
 }
