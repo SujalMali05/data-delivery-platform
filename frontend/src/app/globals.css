@@ -9,6 +9,8 @@
   --bg-card: #13131d;
   --bg-card-hover: #1a1a28;
   --bg-input: #161622;
+  --bg-glass: rgba(19, 19, 29, 0.7);
+  --bg-glass-hover: rgba(26, 26, 40, 0.8);
 
   --border-primary: #2a2a3a;
   --border-secondary: #22222f;
@@ -34,6 +36,45 @@
   --gradient-success: linear-gradient(135deg, #10b981, #06b6d4);
   --gradient-danger: linear-gradient(135deg, #ef4444, #f97316);
   --gradient-surface: linear-gradient(180deg, #13131d, #0a0a0f);
+  --gradient-text-logo: linear-gradient(135deg, #f0f0f5, #a0a0b8);
+}
+
+:root[data-theme='light'] {
+  /* ── Core Colors ─────────────────── */
+  --bg-primary: #f8fafc;
+  --bg-secondary: #f1f5f9;
+  --bg-tertiary: #e2e8f0;
+  --bg-card: #ffffff;
+  --bg-card-hover: #f8fafc;
+  --bg-input: #ffffff;
+  --bg-glass: rgba(255, 255, 255, 0.7);
+  --bg-glass-hover: rgba(248, 250, 252, 0.8);
+
+  --border-primary: #cbd5e1;
+  --border-secondary: #e2e8f0;
+  --border-accent: #94a3b8;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-tertiary: #64748b;
+  --text-muted: #94a3b8;
+
+  /* ── Accent Colors ──────────────── */
+  --accent-blue: #4f46e5;
+  --accent-blue-glow: rgba(79, 70, 229, 0.12);
+  --accent-emerald: #059669;
+  --accent-emerald-glow: rgba(5, 150, 105, 0.12);
+  --accent-amber: #d97706;
+  --accent-red: #dc2626;
+  --accent-purple: #9333ea;
+  --accent-cyan: #0891b2;
+
+  /* ── Gradients ──────────────────── */
+  --gradient-primary: linear-gradient(135deg, #4f46e5, #7c3aed);
+  --gradient-success: linear-gradient(135deg, #059669, #0891b2);
+  --gradient-danger: linear-gradient(135deg, #dc2626, #ea580c);
+  --gradient-surface: linear-gradient(180deg, #ffffff, #f8fafc);
+  --gradient-text-logo: linear-gradient(135deg, #0f172a, #475569);
 }
 
 * {
@@ -110,14 +151,14 @@ body {
 
 /* ── Glass Effect ──────────────────── */
 .glass {
-  background: rgba(19, 19, 29, 0.7);
+  background: var(--bg-glass);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border: 1px solid var(--border-secondary);
 }
 
 .glass-hover:hover {
-  background: rgba(26, 26, 40, 0.8);
+  background: var(--bg-glass-hover);
   border-color: var(--border-accent);
 }
 

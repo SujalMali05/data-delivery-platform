@@ -121,7 +121,7 @@ export default function LoginPage() {
                 fontSize: '28px',
                 fontWeight: 700,
                 background:
-                  'linear-gradient(135deg, #f0f0f5, #a0a0b8)',
+                  'var(--gradient-text-logo, linear-gradient(135deg, #f0f0f5, #a0a0b8))',
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent',
               }}

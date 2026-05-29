@@ -15,6 +15,8 @@ import {
   Database,
   ChevronRight,
   Calculator,
+  Sun,
+  Moon,
 } from 'lucide-react';
 
 const navItems = [
@@ -37,6 +39,21 @@ export default function DashboardLayout({
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('ddp_theme') as 'dark' | 'light';
+    const initialTheme = savedTheme || 'dark';
+    setTheme(initialTheme);
+    document.documentElement.setAttribute('data-theme', initialTheme);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    localStorage.setItem('ddp_theme', nextTheme);
+    document.documentElement.setAttribute('data-theme', nextTheme);
+  };
 
   useEffect(() => {
     const token = localStorage.getItem('ddp_token');
@@ -238,6 +255,7 @@ export default function DashboardLayout({
             borderBottom: '1px solid var(--border-secondary)',
             display: 'flex',
             alignItems: 'center',
+            justifyContent: 'space-between',
             padding: '0 32px',
             background: 'var(--bg-secondary)',
             position: 'sticky',
@@ -279,6 +297,27 @@ export default function DashboardLayout({
               </span>
             ))}
           </div>
+
+          <button
+            onClick={toggleTheme}
+            style={{
+              width: '36px',
+              height: '36px',
+              borderRadius: '8px',
+              border: '1px solid var(--border-secondary)',
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              outline: 'none',
+            }}
+            title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          >
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+          </button>
         </header>
 
         {/* Page Content */}
