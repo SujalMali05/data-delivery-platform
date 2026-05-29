@@ -287,16 +287,33 @@ export class CustomersService {
         customer.region,
       );
 
-      // Format rclone list path: remoteName:bucket/path
-      const rclonePath = `${customer.bucketName}/${path || ''}`.replace(/\/$/, '');
+      // Format rclone list path with prefixPath support: remoteName:bucket/prefix/path
+      const basePrefix = customer.prefixPath ? customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+      const searchPath = path ? path.trim().replace(/^\/|\/$/g, '') : '';
+      
+      let rclonePath = customer.bucketName;
+      if (basePrefix) {
+        rclonePath += `/${basePrefix}`;
+      }
+      if (searchPath) {
+        rclonePath += `/${searchPath}`;
+      }
+
       const response = await this.rcloneService.listDirectory(`${remoteName}:`, rclonePath);
 
       const list = response.list || [];
       
+      let prefixToStrip = customer.bucketName + '/';
+      if (basePrefix) {
+        prefixToStrip += basePrefix + '/';
+      }
+
       const mappedList = list.map((item: any) => {
-        const relativePath = item.Path.startsWith(customer.bucketName + '/')
-          ? item.Path.substring(customer.bucketName.length + 1)
-          : item.Path;
+        const relativePath = item.Path.startsWith(prefixToStrip)
+          ? item.Path.substring(prefixToStrip.length)
+          : item.Path.startsWith(customer.bucketName + '/')
+            ? item.Path.substring(customer.bucketName.length + 1)
+            : item.Path;
         return {
           name: item.Name,
           path: relativePath,

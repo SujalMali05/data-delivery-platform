@@ -19,6 +19,7 @@ interface Customer {
   name: string;
   bucketName: string;
   region: string;
+  prefixPath?: string;
 }
 
 interface S3Item {
@@ -229,7 +230,9 @@ export default function S3BrowserPage() {
                   fontWeight: !path ? 600 : 400,
                 }}
               >
-                {selectedCustomer?.bucketName || 's3-bucket'}
+                {selectedCustomer?.bucketName
+                  ? `${selectedCustomer.bucketName}${selectedCustomer.prefixPath ? '/' + selectedCustomer.prefixPath.replace(/^\/|\/$/g, '') : ''}`
+                  : 's3-bucket'}
               </span>
 
               {path.split('/').filter(Boolean).map((part, idx, arr) => (
