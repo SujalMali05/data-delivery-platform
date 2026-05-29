@@ -41,40 +41,40 @@
 
 :root[data-theme='light'] {
   /* ── Core Colors ─────────────────── */
-  --bg-primary: #e6edf4;
-  --bg-secondary: #dbe4ee;
-  --bg-tertiary: #ccd7e4;
-  --bg-card: #f0f5fa;
-  --bg-card-hover: #ebf1f6;
-  --bg-input: #ffffff;
-  --bg-glass: rgba(240, 245, 250, 0.75);
-  --bg-glass-hover: rgba(235, 241, 246, 0.85);
+  --bg-primary: #d0e0f0;
+  --bg-secondary: #c0d2e5;
+  --bg-tertiary: #afc4da;
+  --bg-card: #e4eef7;
+  --bg-card-hover: #d9e6f3;
+  --bg-input: #eaf2f8;
+  --bg-glass: rgba(228, 238, 247, 0.8);
+  --bg-glass-hover: rgba(217, 230, 243, 0.9);
 
-  --border-primary: #b9c9da;
-  --border-secondary: #cbd8e6;
-  --border-accent: #9ab3cd;
+  --border-primary: #abbfd5;
+  --border-secondary: #bdcee0;
+  --border-accent: #8aa2bd;
 
-  --text-primary: #1e293b;
-  --text-secondary: #334155;
-  --text-tertiary: #475569;
-  --text-muted: #64748b;
+  --text-primary: #0f2038;
+  --text-secondary: #243b58;
+  --text-tertiary: #3d5675;
+  --text-muted: #5b7596;
 
   /* ── Accent Colors ──────────────── */
-  --accent-blue: #4f46e5;
-  --accent-blue-glow: rgba(79, 70, 229, 0.12);
-  --accent-emerald: #059669;
-  --accent-emerald-glow: rgba(5, 150, 105, 0.12);
-  --accent-amber: #d97706;
-  --accent-red: #dc2626;
-  --accent-purple: #9333ea;
-  --accent-cyan: #0891b2;
+  --accent-blue: #3b3fcc;
+  --accent-blue-glow: rgba(59, 63, 204, 0.12);
+  --accent-emerald: #047857;
+  --accent-emerald-glow: rgba(4, 120, 87, 0.12);
+  --accent-amber: #b45309;
+  --accent-red: #b91c1c;
+  --accent-purple: #7e22ce;
+  --accent-cyan: #0369a1;
 
   /* ── Gradients ──────────────────── */
-  --gradient-primary: linear-gradient(135deg, #4f46e5, #7c3aed);
-  --gradient-success: linear-gradient(135deg, #059669, #0891b2);
-  --gradient-danger: linear-gradient(135deg, #dc2626, #ea580c);
-  --gradient-surface: linear-gradient(180deg, #f0f5fa, #e6edf4);
-  --gradient-text-logo: linear-gradient(135deg, #1e293b, #475569);
+  --gradient-primary: linear-gradient(135deg, #3b3fcc, #6d28d9);
+  --gradient-success: linear-gradient(135deg, #047857, #0369a1);
+  --gradient-danger: linear-gradient(135deg, #b91c1c, #c2410c);
+  --gradient-surface: linear-gradient(180deg, #e4eef7, #d0e0f0);
+  --gradient-text-logo: linear-gradient(135deg, #0f2038, #3d5675);
 }
 
 * {
