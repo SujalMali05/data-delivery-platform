@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { gdriveApi, customersApi } from '../lib/api-client';
 import {
   Folder,
@@ -48,6 +49,11 @@ export default function FolderBrowser({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -130,11 +136,11 @@ export default function FolderBrowser({
     }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !mounted) return null;
 
   const breadcrumbs = currentPath ? currentPath.split('/') : [];
 
-  return (
+  return createPortal(
     <div
       style={{
         position: 'fixed',
@@ -142,7 +148,7 @@ export default function FolderBrowser({
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(5, 5, 10, 0.75)',
+        background: 'rgba(15, 23, 42, 0.45)',
         backdropFilter: 'blur(8px)',
         zIndex: 1000,
         display: 'flex',
@@ -358,6 +364,7 @@ export default function FolderBrowser({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
