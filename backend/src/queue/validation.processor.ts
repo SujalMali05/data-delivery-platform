@@ -112,6 +112,15 @@ export class ValidationProcessor extends WorkerHost {
 
       this.logger.log(`Validation sources: Source [${srcFs}] | Destination [${dstFs}]`);
 
+      // Clean up duplicate objects on Google Drive before calculating size or performing check
+      try {
+        this.logger.log(`Cleaning up duplicates on Google Drive source: ${srcFs}`);
+        await this.rcloneService.dedupe(srcFs, 'newest');
+        this.logger.log(`Google Drive source deduplication completed successfully`);
+      } catch (dedupeErr: any) {
+        this.logger.warn(`Deduplication on Google Drive source failed: ${dedupeErr.message}`);
+      }
+
       // 4. Sizing Calculations
       let srcBytes = BigInt(0);
       let srcFiles = 0;

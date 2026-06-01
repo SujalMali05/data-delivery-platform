@@ -376,6 +376,11 @@ export class RcloneService {
       _async: true,
       _group: group,
       oneWay,
+      match: true,
+      differ: true,
+      missingOnSrc: true,
+      missingOnDst: true,
+      error: true,
     };
 
     this.logger.log(`Starting rclone check: ${srcFs} vs ${dstFs} (group: ${group})`);
@@ -388,6 +393,27 @@ export class RcloneService {
     } catch (error: any) {
       this.logger.error(`Failed to start rclone check: ${error.message}`);
       throw new Error(`rclone check failed: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Run rclone dedupe CLI command via core/command RC API to resolve duplicates on a remote
+   */
+  async dedupe(
+    fs: string,
+    mode: 'newest' | 'oldest' | 'rename' | 'skip' = 'newest',
+  ): Promise<any> {
+    this.logger.log(`Running rclone dedupe on ${fs} with mode ${mode}`);
+    try {
+      const response = await this.client.post('/core/command', {
+        command: 'dedupe',
+        arg: [fs],
+        opt: { 'dedupe-mode': mode },
+      });
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Failed to dedupe on ${fs}: ${error.message}`);
+      throw new Error(`rclone dedupe failed: ${error.response?.data?.error || error.message}`);
     }
   }
 }

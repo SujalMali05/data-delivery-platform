@@ -517,7 +517,6 @@ export default function ValidationPage() {
                       </td>
                       <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
-                          {hasStats ? (
                             <Link 
                               href={`/dashboard/validation/${v.id}`} 
                               className="btn-secondary" 
@@ -533,25 +532,8 @@ export default function ValidationPage() {
                                 textDecoration: 'none'
                               }}
                             >
-                              <Eye size={13} /> View Report
+                              <Eye size={13} /> {v.status === 'COMPLETED' ? 'View Report' : ['PENDING', 'RUNNING'].includes(v.status) ? 'Checking...' : 'View Details'}
                             </Link>
-                          ) : (
-                            <button 
-                              className="btn-secondary" 
-                              disabled 
-                              style={{ 
-                                padding: '6px 12px', 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '6px', 
-                                opacity: 0.5,
-                                whiteSpace: 'nowrap',
-                                fontSize: '12px'
-                              }}
-                            >
-                              <Eye size={13} /> Report
-                            </button>
-                          )}
                           <button 
                             className="btn-danger" 
                             style={{ 

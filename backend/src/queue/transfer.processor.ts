@@ -43,6 +43,8 @@ export class TransferProcessor extends WorkerHost {
 
     let gdriveRemote: string | null = null;
     let s3Remote: string | null = null;
+    let isPull = false;
+    let dstFs = '';
 
     let attempts = 0;
     const maxTokenExpiredRetries = 5;
@@ -126,6 +128,26 @@ export class TransferProcessor extends WorkerHost {
 
             s3Remote = s3RemoteName;
             gdriveRemote = gdriveRemoteName;
+
+            isPull = transfer.direction === 'PULL';
+            const gdriveFs = `${gdriveRemote}:${transfer.source.drivePath}`;
+            let dstPath = transfer.destinationPath || '';
+            const prefixPath = transfer.customer.prefixPath ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+            const cleanDstPath = dstPath.trim().replace(/^\/|\/$/g, '');
+            let s3Path = cleanDstPath;
+            if (prefixPath) {
+              if (cleanDstPath === '') {
+                s3Path = prefixPath;
+              } else if (cleanDstPath === prefixPath) {
+                s3Path = prefixPath;
+              } else if (cleanDstPath.startsWith(prefixPath + '/')) {
+                s3Path = cleanDstPath;
+              } else {
+                s3Path = `${prefixPath}/${cleanDstPath}`;
+              }
+            }
+            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
+            dstFs = isPull ? gdriveFs : s3Fs;
           } else {
             // On first attempt, prevent duplicate processing if already completed/cancelled
             if (attempts === 0 && (transfer.status === 'COMPLETED' || transfer.status === 'CANCELLED')) {
@@ -157,7 +179,7 @@ export class TransferProcessor extends WorkerHost {
             );
 
             // ── Step 4: Start rclone transfer ─────────────────────
-            const isPull = transfer.direction === 'PULL';
+            isPull = transfer.direction === 'PULL';
             const gdriveFs = `${gdriveRemote}:${transfer.source.drivePath}`;
             let dstPath = transfer.destinationPath || '';
             const prefixPath = transfer.customer.prefixPath ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
@@ -178,8 +200,31 @@ export class TransferProcessor extends WorkerHost {
             const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
 
             const srcFs = isPull ? s3Fs : gdriveFs;
-            const dstFs = isPull ? gdriveFs : s3Fs;
+            dstFs = isPull ? gdriveFs : s3Fs;
             const mode = transfer.mode.toLowerCase() as 'copy' | 'sync' | 'move';
+
+            // Deduplicate Google Drive BEFORE transfer starts to ensure a clean source or destination
+            const gdriveFsToDedupe = isPull ? dstFs : srcFs;
+            try {
+              await this.logTransfer(
+                transferId,
+                'INFO',
+                `🧹 Pre-transfer: Cleaning up duplicates on Google Drive path: ${gdriveFsToDedupe}`,
+              );
+              await this.rcloneService.dedupe(gdriveFsToDedupe, 'newest');
+              await this.logTransfer(
+                transferId,
+                'INFO',
+                `🧹 Pre-transfer: Google Drive deduplicated successfully`,
+              );
+            } catch (dedupeErr: any) {
+              this.logger.warn(`Pre-transfer deduplication failed: ${dedupeErr.message}`);
+              await this.logTransfer(
+                transferId,
+                'WARN',
+                `Pre-transfer Google Drive deduplication warning: ${dedupeErr.message}`,
+              );
+            }
 
             const result = await this.rcloneService.startTransfer(
               srcFs,
@@ -230,6 +275,30 @@ export class TransferProcessor extends WorkerHost {
           }
 
           // ── Step 6: Mark as completed ─────────────────────────
+          // Deduplicate Google Drive AFTER transfer completes (PULL transfers)
+          if (isPull) {
+            try {
+              await this.logTransfer(
+                transferId,
+                'INFO',
+                `🧹 Post-transfer: Deduplicating Google Drive destination path: ${dstFs}`,
+              );
+              await this.rcloneService.dedupe(dstFs, 'newest');
+              await this.logTransfer(
+                transferId,
+                'INFO',
+                `🧹 Post-transfer: Google Drive destination deduplicated successfully`,
+              );
+            } catch (dedupeErr: any) {
+              this.logger.warn(`Post-transfer deduplication failed: ${dedupeErr.message}`);
+              await this.logTransfer(
+                transferId,
+                'WARN',
+                `Post-transfer Google Drive deduplication warning: ${dedupeErr.message}`,
+              );
+            }
+          }
+
           await this.updateTransferStatus(transferId, 'COMPLETED');
           await this.logTransfer(transferId, 'INFO', '✅ Transfer completed successfully');
 
