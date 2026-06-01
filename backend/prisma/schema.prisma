@@ -49,6 +49,7 @@ model Customer {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   transfers Transfer[]
+  validations Validation[]
 
   @@map("customers")
 }
@@ -69,6 +70,7 @@ model GoogleDriveSource {
   updatedAt     DateTime       @updatedAt @map("updated_at")
 
   transfers Transfer[]
+  validations Validation[]
 
   @@map("google_drive_sources")
 }
@@ -247,4 +249,55 @@ enum NotificationChannel {
   EMAIL
   SLACK
   TELEGRAM
+}
+
+// ── Folder Validations ────────────────────────────────────────────────────────
+
+model Validation {
+  id              String           @id @default(uuid())
+  name            String
+  status          ValidationStatus @default(PENDING)
+  oneWay          Boolean          @default(false) @map("one_way")
+
+  // Source (Google Drive)
+  sourceId        String            @map("source_id")
+  source          GoogleDriveSource @relation(fields: [sourceId], references: [id])
+  sourcePath      String            @map("source_path")
+
+  // Destination (S3 Customer)
+  customerId      String            @map("customer_id")
+  customer        Customer          @relation(fields: [customerId], references: [id])
+  destinationPath String            @map("destination_path")
+
+  // Sizing summaries
+  srcTotalBytes   BigInt            @default(0) @map("src_total_bytes")
+  srcTotalFiles   Int               @default(0) @map("src_total_files")
+  dstTotalBytes   BigInt            @default(0) @map("dst_total_bytes")
+  dstTotalFiles   Int               @default(0) @map("dst_total_files")
+
+  // Comparison counters
+  matchCount      Int               @default(0) @map("match_count")
+  differCount     Int               @default(0) @map("differ_count")
+  missingSrcCount Int               @default(0) @map("missing_src_count")
+  missingDstCount Int               @default(0) @map("missing_dst_count")
+  errorCount      Int               @default(0) @map("error_count")
+
+  // Output storage
+  reportPath      String?           @map("report_path")
+  errorMessage    String?           @map("error_message")
+
+  // Timestamps
+  startedAt       DateTime?         @map("started_at")
+  completedAt     DateTime?         @map("completed_at")
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  @@map("validations")
+}
+
+enum ValidationStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
 }

@@ -45,6 +45,7 @@ export interface RcloneJobStatus {
   id: number;
   startTime: string;
   success: boolean;
+  output?: any;
 }
 
 @Injectable()
@@ -357,6 +358,36 @@ export class RcloneService {
     } catch (error: any) {
       this.logger.error(`Failed to calculate size on ${fs} at path ${remote}: ${error.message}`);
       throw new Error(`rclone size failed: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Start a recursive validation check between two paths asynchronously
+   */
+  async startCheck(
+    srcFs: string,
+    dstFs: string,
+    group: string,
+    oneWay = false,
+  ): Promise<RcloneJobResult> {
+    const payload = {
+      srcFs,
+      dstFs,
+      _async: true,
+      _group: group,
+      oneWay,
+    };
+
+    this.logger.log(`Starting rclone check: ${srcFs} vs ${dstFs} (group: ${group})`);
+
+    try {
+      const response = await this.client.post('/operations/check', payload, {
+        timeout: 60000,
+      });
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Failed to start rclone check: ${error.message}`);
+      throw new Error(`rclone check failed: ${error.response?.data?.error || error.message}`);
     }
   }
 }

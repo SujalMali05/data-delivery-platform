@@ -17,6 +17,7 @@ import { SchedulerModule } from './scheduler/scheduler.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { LogsModule } from './logs/logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { ValidationModule } from './validation/validation.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { DashboardModule } from './dashboard/dashboard.module';
     NotificationsModule,
     LogsModule,
     DashboardModule,
+    ValidationModule,
   ],
 })
 export class AppModule {}

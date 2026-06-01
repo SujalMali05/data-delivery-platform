@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { TransferProcessor } from './transfer.processor';
+import { ValidationProcessor } from './validation.processor';
 import { RcloneModule } from '../rclone/rclone.module';
 import { AwsModule } from '../aws/aws.module';
 import { TransfersModule } from '../transfers/transfers.module';
@@ -8,6 +9,7 @@ import {
   TRANSFER_QUEUE,
   NOTIFICATION_QUEUE,
   SCHEDULED_TRANSFER_QUEUE,
+  VALIDATION_QUEUE,
 } from './constants';
 
 @Module({
@@ -44,11 +46,20 @@ import {
           removeOnComplete: { count: 50 },
         },
       },
+      {
+        name: VALIDATION_QUEUE,
+        defaultJobOptions: {
+          attempts: 2,
+          removeOnComplete: { count: 50 },
+          removeOnFail: { count: 100 },
+        },
+      },
     ),
     RcloneModule,
     AwsModule,
     TransfersModule,
   ],
-  providers: [TransferProcessor],
+  providers: [TransferProcessor, ValidationProcessor],
+  exports: [BullModule],
 })
 export class QueueModule {}

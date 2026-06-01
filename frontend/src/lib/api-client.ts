@@ -105,3 +105,13 @@ export const logsApi = {
     apiClient.get('/logs', { params }),
   byTransfer: (transferId: string) => apiClient.get(`/logs/transfer/${transferId}`),
 };
+
+// Validations
+export const validationApi = {
+  list: () => apiClient.get('/validation'),
+  get: (id: string) => apiClient.get(`/validation/${id}`),
+  getReport: (id: string) => apiClient.get(`/validation/${id}/report`),
+  create: (data: { name: string; sourceId: string; sourcePath?: string; customerId: string; destinationPath?: string; oneWay?: boolean }) =>
+    apiClient.post('/validation', data),
+  delete: (id: string) => apiClient.delete(`/validation/${id}`),
+};
