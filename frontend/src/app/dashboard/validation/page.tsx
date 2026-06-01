@@ -67,7 +67,6 @@ export default function ValidationPage() {
   // Folder Browser Modal State
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [browserTarget, setBrowserTarget] = useState<'gdrive' | 's3'>('gdrive');
-  const [gdriveFromRoot, setGdriveFromRoot] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -280,7 +279,6 @@ export default function ValidationPage() {
                       value={formData.sourceId}
                       onChange={(e) => {
                         setFormData({ ...formData, sourceId: e.target.value, sourcePath: '' });
-                        setGdriveFromRoot(false);
                       }}
                       required
                     >
@@ -325,28 +323,7 @@ export default function ValidationPage() {
                       </button>
                     </div>
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '2px' }}>
-                    <input
-                      type="checkbox"
-                      id="gdriveFromRoot"
-                      checked={gdriveFromRoot}
-                      onChange={(e) => {
-                        const isChecked = e.target.checked;
-                        setGdriveFromRoot(isChecked);
-                        if (isChecked) {
-                          if (!formData.sourcePath.startsWith('/')) {
-                            setFormData((prev) => ({ ...prev, sourcePath: '/' + prev.sourcePath.replace(/^\//, '') }));
-                          }
-                        } else {
-                          setFormData((prev) => ({ ...prev, sourcePath: prev.sourcePath.replace(/^\//, '') }));
-                        }
-                      }}
-                      style={{ cursor: 'pointer' }}
-                    />
-                    <label htmlFor="gdriveFromRoot" style={{ fontSize: '11px', color: 'var(--text-tertiary)', cursor: 'pointer', userSelect: 'none' }}>
-                      Custom Path from Root (Ignore source default path)
-                    </label>
-                  </div>
+
                 </div>
               </div>
 
@@ -562,14 +539,11 @@ export default function ValidationPage() {
               const cleanPath = selectedPath.replace(/^\//, '').replace(/\/+$/, '');
               const drivePath = getSelectedSource()?.drivePath?.replace(/^\//, '').replace(/\/+$/, '') || '';
               
-              if (gdriveFromRoot) {
-                setFormData({ ...formData, sourcePath: '/' + cleanPath });
-              } else if (drivePath && (cleanPath === drivePath || cleanPath.startsWith(drivePath + '/'))) {
+              if (drivePath && (cleanPath === drivePath || cleanPath.startsWith(drivePath + '/'))) {
                 const relativePath = cleanPath === drivePath ? '' : cleanPath.substring(drivePath.length + 1);
                 setFormData({ ...formData, sourcePath: relativePath });
               } else {
-                setGdriveFromRoot(true);
-                setFormData({ ...formData, sourcePath: '/' + cleanPath });
+                setFormData({ ...formData, sourcePath: cleanPath });
               }
             } else {
               setFormData({ ...formData, destinationPath: selectedPath });
@@ -578,14 +552,11 @@ export default function ValidationPage() {
           type={browserTarget}
           initialPath={
             browserTarget === 'gdrive'
-              ? (gdriveFromRoot
-                  ? formData.sourcePath.replace(/^\//, '')
-                  : (() => {
-                      const drivePath = getSelectedSource()?.drivePath?.replace(/^\//, '').replace(/\/+$/, '') || '';
-                      const startPath = formData.sourcePath.replace(/^\//, '').replace(/\/+$/, '');
-                      return drivePath ? (startPath ? `${drivePath}/${startPath}` : drivePath) : startPath;
-                    })()
-                )
+              ? (() => {
+                  const drivePath = getSelectedSource()?.drivePath?.replace(/^\//, '').replace(/\/+$/, '') || '';
+                  const startPath = formData.sourcePath.replace(/^\//, '').replace(/\/+$/, '');
+                  return drivePath ? (startPath ? `${drivePath}/${startPath}` : drivePath) : startPath;
+                })()
               : formData.destinationPath
           }
           s3Params={

@@ -86,13 +86,10 @@ export class ValidationProcessor extends WorkerHost {
         validation.customer.region,
       );
 
-      let srcPath = validation.sourcePath || '';
-      const isFromRoot = srcPath.startsWith('/');
-      const cleanSrcPath = srcPath.replace(/^\//, '');
-
-      const srcFs = isFromRoot
-        ? `${gdriveRemote}:${cleanSrcPath}`.replace(/\/+$/, '')
-        : `${gdriveRemote}:${validation.source.drivePath}/${cleanSrcPath}`.replace(/\/+$/, '');
+      const drivePath = validation.source.drivePath ? validation.source.drivePath.replace(/^\/|\/$/g, '') : '';
+      const sourcePath = validation.sourcePath ? validation.sourcePath.replace(/^\/|\/$/g, '') : '';
+      const cleanSrcPath = drivePath ? (sourcePath ? `${drivePath}/${sourcePath}` : drivePath) : sourcePath;
+      const srcFs = `${gdriveRemote}:${cleanSrcPath}`;
 
       let dstPath = validation.destinationPath || '';
       const prefixPath = validation.customer.prefixPath ? validation.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
@@ -199,9 +196,7 @@ export class ValidationProcessor extends WorkerHost {
         oneWay: validation.oneWay,
         source: {
           name: validation.source.name,
-          path: isFromRoot
-            ? cleanSrcPath
-            : `${validation.source.drivePath}/${cleanSrcPath}`.replace(/\/+$/, ''),
+          path: cleanSrcPath,
         },
         destination: {
           customer: validation.customer.name,
