@@ -274,15 +274,33 @@ export class GdriveService implements OnApplicationBootstrap {
 
     try {
       let source: any = null;
-      if (sourceId && !sourceId.startsWith('GLOBAL_')) {
+      if (sourceId) {
         source = await this.prisma.googleDriveSource.findUnique({ where: { id: sourceId } });
       }
 
-      const finalAuthType = source ? (source.authType || 'SERVICE_ACCOUNT') : (authType || 'SERVICE_ACCOUNT');
+      let finalAuthType = source ? (source.authType || 'SERVICE_ACCOUNT') : (authType || 'SERVICE_ACCOUNT');
       const finalSharedDriveId = source ? (source.sharedDriveId || undefined) : (sharedDriveId || undefined);
 
+      const hasEnvOAuth = !!(
+        this.configService.get('GOOGLE_OAUTH_CLIENT_ID') &&
+        this.configService.get('GOOGLE_OAUTH_CLIENT_SECRET') &&
+        this.configService.get('GOOGLE_OAUTH_TOKEN')
+      );
+
+      // Force OAUTH for deduplication if it's a global source or we have OAuth credentials and are dealing with a service account
+      // that cannot delete/rename files in personal My Drives.
+      if (hasEnvOAuth && (sourceId === 'GLOBAL_SERVICE_ACCOUNT' || sourceId === 'GLOBAL_OAUTH' || finalAuthType === 'SERVICE_ACCOUNT')) {
+        this.logger.log(`Using OAuth2 credentials for manual deduplication on source: ${sourceId}`);
+        finalAuthType = 'OAUTH';
+      }
+
       if (finalAuthType === 'OAUTH') {
-        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+        const clientId = source?.clientId || this.configService.get<string>('GOOGLE_OAUTH_CLIENT_ID');
+        const clientSecret = source?.clientSecret || this.configService.get<string>('GOOGLE_OAUTH_CLIENT_SECRET');
+        const tokenJson = source?.tokenJson || this.configService.get<string>('GOOGLE_OAUTH_TOKEN');
+        if (!clientId || !clientSecret || !tokenJson) {
+          throw new Error('OAuth2 credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_TOKEN) are not configured');
+        }
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           authType: 'OAUTH',
           clientId,

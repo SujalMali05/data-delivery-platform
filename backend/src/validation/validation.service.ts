@@ -15,12 +15,73 @@ export class ValidationService {
     @InjectQueue(VALIDATION_QUEUE) private readonly validationQueue: Queue,
   ) {}
 
+  private async resolveNextValidationName(requestedName: string): Promise<string> {
+    // 1. Parse name to see if it already ends in -V\d+
+    const versionMatch = requestedName.match(/(.+)[_-][Vv](\d+)$/);
+    let baseName = requestedName;
+
+    if (versionMatch) {
+      baseName = versionMatch[1].trim();
+    }
+
+    // 2. Fetch all validation records whose names start with baseName
+    const existing = await this.prisma.validation.findMany({
+      where: {
+        name: {
+          startsWith: baseName,
+        },
+      },
+      select: {
+        name: true,
+      },
+    });
+
+    if (existing.length === 0) {
+      // No existing validations with this base name, we can use the requestedName directly
+      return requestedName;
+    }
+
+    // 3. Escape baseName for regex
+    const escapedBase = baseName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`^${escapedBase}(?:[_-][Vv](\\d+))?$`, 'i');
+
+    let maxVersion = 0;
+    let hasExactMatch = false;
+
+    for (const record of existing) {
+      const match = record.name.match(regex);
+      if (match) {
+        if (record.name.toLowerCase() === requestedName.toLowerCase()) {
+          hasExactMatch = true;
+        }
+        if (match[1]) {
+          const ver = parseInt(match[1], 10);
+          if (ver > maxVersion) {
+            maxVersion = ver;
+          }
+        }
+      }
+    }
+
+    // 4. Decide name based on match status and max version
+    if (!hasExactMatch) {
+      // If the exact requested name is not in use, use it
+      return requestedName;
+    }
+
+    // If it is in use, we must append/increment version
+    // If the maximum version is 0 (meaning we only found baseName without suffix), the next version is 1
+    const nextVersion = maxVersion > 0 ? maxVersion + 1 : 1;
+    return `${baseName}-V${nextVersion}`;
+  }
+
   async create(dto: CreateValidationDto) {
-    this.logger.log(`Creating validation task in DB: ${dto.name}`);
+    const finalName = await this.resolveNextValidationName(dto.name);
+    this.logger.log(`Resolved validation name: "${dto.name}" -> "${finalName}"`);
 
     const validation = await this.prisma.validation.create({
       data: {
-        name: dto.name,
+        name: finalName,
         sourceId: dto.sourceId,
         sourcePath: dto.sourcePath || '',
         customerId: dto.customerId,
