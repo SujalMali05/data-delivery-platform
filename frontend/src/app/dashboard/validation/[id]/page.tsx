@@ -221,7 +221,7 @@ export default function ValidationReportPage() {
     );
   }
 
-  if (errorMsg || !report || !metadata) {
+  if (errorMsg || !metadata || (metadata.status === 'COMPLETED' && !report)) {
     return (
       <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <Link href="/dashboard/validation" className="btn-secondary" style={{ width: 'fit-content', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -240,6 +240,7 @@ export default function ValidationReportPage() {
 
   // Get active list from report based on selected tab
   const getActiveList = (): any[] => {
+    if (!report) return [];
     switch (activeTab) {
       case 'match':
         return report.match;
