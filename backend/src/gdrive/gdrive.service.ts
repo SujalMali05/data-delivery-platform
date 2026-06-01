@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RcloneService } from '../rclone/rclone.service';
 import { RcloneConfigService } from '../rclone/rclone-config.service';
 
 @Injectable()
-export class GdriveService {
+export class GdriveService implements OnApplicationBootstrap {
   private readonly logger = new Logger('GdriveService');
 
   constructor(
@@ -33,11 +33,47 @@ export class GdriveService {
     }
   }
 
+  async onApplicationBootstrap() {
+    this.logger.log('Verifying global Google Drive sources...');
+    try {
+      await this.prisma.googleDriveSource.upsert({
+        where: { id: 'GLOBAL_SERVICE_ACCOUNT' },
+        update: {},
+        create: {
+          id: 'GLOBAL_SERVICE_ACCOUNT',
+          name: 'Global Service Account',
+          drivePath: '',
+          authType: 'SERVICE_ACCOUNT',
+        },
+      });
+
+      await this.prisma.googleDriveSource.upsert({
+        where: { id: 'GLOBAL_OAUTH' },
+        update: {},
+        create: {
+          id: 'GLOBAL_OAUTH',
+          name: 'Global User Account',
+          drivePath: '',
+          authType: 'OAUTH',
+        },
+      });
+      this.logger.log('Global Google Drive sources verified.');
+    } catch (err: any) {
+      this.logger.error(`Failed to verify/seed global Google Drive sources: ${err.message}`);
+    }
+  }
+
   /**
    * List saved Google Drive sources
    */
   async getSources() {
     return this.prisma.googleDriveSource.findMany({
+      where: {
+        NOT: [
+          { id: 'GLOBAL_SERVICE_ACCOUNT' },
+          { id: 'GLOBAL_OAUTH' },
+        ],
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {

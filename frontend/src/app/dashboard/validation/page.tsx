@@ -167,6 +167,14 @@ export default function ValidationPage() {
   };
 
   const getSelectedSource = () => {
+    if (formData.sourceId.startsWith('GLOBAL_')) {
+      return {
+        id: formData.sourceId,
+        name: formData.sourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'Global Service Account' : 'Global User Account',
+        authType: formData.sourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'SERVICE_ACCOUNT' : 'OAUTH',
+        drivePath: '',
+      };
+    }
     return sources.find((s) => s.id === formData.sourceId);
   };
 
@@ -277,11 +285,24 @@ export default function ValidationPage() {
                       required
                     >
                       <option value="">Select source connection...</option>
-                      {sources.map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name} ({s.drivePath})
-                        </option>
-                      ))}
+                      <option value="GLOBAL_SERVICE_ACCOUNT">Global Service Account (Service Account)</option>
+                      <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
+                      <optgroup label="Saved Pull Sources (OAuth2 Token)">
+                        {sources
+                          .filter((s: any) => s.authType === 'OAUTH')
+                          .map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                          ))
+                        }
+                      </optgroup>
+                      <optgroup label="Saved Push Sources (Service Account)">
+                        {sources
+                          .filter((s: any) => s.authType === 'SERVICE_ACCOUNT')
+                          .map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                          ))
+                        }
+                      </optgroup>
                     </select>
                   </div>
                   <div>
