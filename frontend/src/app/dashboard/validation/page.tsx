@@ -70,9 +70,20 @@ export default function ValidationPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchValidations();
+    fetchValidations(true);
     fetchDropdowns();
   }, []);
+
+  useEffect(() => {
+    const hasActive = validations.some((v) => ['PENDING', 'RUNNING'].includes(v.status));
+    if (!hasActive) return;
+
+    const interval = setInterval(() => {
+      fetchValidations(false);
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [validations]);
 
   // Auto-fill destinationPath when customer changes
   useEffect(() => {
@@ -86,8 +97,8 @@ export default function ValidationPage() {
     }
   }, [formData.customerId, customers]);
 
-  const fetchValidations = async () => {
-    setLoading(true);
+  const fetchValidations = async (showLoading = false) => {
+    if (showLoading) setLoading(true);
     try {
       const res = await validationApi.list();
       setValidations(res.data);
@@ -439,7 +450,7 @@ export default function ValidationPage() {
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Audit Results (Differ / Missing)</th>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '130px' }}>Status</th>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '160px' }}>Execution Date</th>
-                  <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '140px', textAlign: 'right' }}>Actions</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '180px', textAlign: 'right' }}>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -504,18 +515,53 @@ export default function ValidationPage() {
                       <td style={{ padding: '14px 20px', color: 'var(--text-muted)', fontSize: '12px' }}>
                         {new Date(v.createdAt).toLocaleString()}
                       </td>
-                      <td style={{ padding: '14px 20px', textAlign: 'right' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                      <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
                           {hasStats ? (
-                            <Link href={`/dashboard/validation/${v.id}`} className="btn-secondary" style={{ padding: '6px 10px', display: 'flex', alignItems: 'center', gap: '4px', border: '1px solid var(--accent-blue)', color: 'var(--accent-blue)' }}>
+                            <Link 
+                              href={`/dashboard/validation/${v.id}`} 
+                              className="btn-secondary" 
+                              style={{ 
+                                padding: '6px 12px', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                border: '1px solid var(--accent-blue)', 
+                                color: 'var(--accent-blue)',
+                                whiteSpace: 'nowrap',
+                                fontSize: '12px',
+                                textDecoration: 'none'
+                              }}
+                            >
                               <Eye size={13} /> View Report
                             </Link>
                           ) : (
-                            <button className="btn-secondary" disabled style={{ padding: '6px 10px', opacity: 0.5 }}>
+                            <button 
+                              className="btn-secondary" 
+                              disabled 
+                              style={{ 
+                                padding: '6px 12px', 
+                                display: 'inline-flex', 
+                                alignItems: 'center', 
+                                gap: '6px', 
+                                opacity: 0.5,
+                                whiteSpace: 'nowrap',
+                                fontSize: '12px'
+                              }}
+                            >
                               <Eye size={13} /> Report
                             </button>
                           )}
-                          <button className="btn-danger" style={{ padding: '6px 8px' }} onClick={() => handleDelete(v.id)}>
+                          <button 
+                            className="btn-danger" 
+                            style={{ 
+                              padding: '6px 8px', 
+                              display: 'inline-flex', 
+                              alignItems: 'center', 
+                              justifyContent: 'center' 
+                            }} 
+                            onClick={() => handleDelete(v.id)}
+                          >
                             <Trash2 size={14} />
                           </button>
                         </div>
