@@ -325,11 +325,13 @@ export class RcloneService {
   async listDirectory(
     fs: string,
     remote: string,
+    opt?: { recurse?: boolean },
   ): Promise<any> {
     try {
       const response = await this.client.post('/operations/list', {
         fs,
         remote,
+        opt,
       }, {
         timeout: 120000, // 2 minutes timeout for listing
       });

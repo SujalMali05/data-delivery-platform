@@ -258,4 +258,64 @@ export class GdriveService implements OnApplicationBootstrap {
       }
     }
   }
+
+  /**
+   * Execute manual dedupe on a Google Drive path
+   */
+  async dedupePath(
+    sourceId: string,
+    path: string = '',
+    mode: 'newest' | 'oldest' | 'rename' | 'skip' = 'newest',
+    sharedDriveId?: string,
+    authType?: 'SERVICE_ACCOUNT' | 'OAUTH',
+  ) {
+    const tempJobId = `dedupe-${Date.now()}`;
+    let remoteName = '';
+
+    try {
+      let source: any = null;
+      if (sourceId && !sourceId.startsWith('GLOBAL_')) {
+        source = await this.prisma.googleDriveSource.findUnique({ where: { id: sourceId } });
+      }
+
+      const finalAuthType = source ? (source.authType || 'SERVICE_ACCOUNT') : (authType || 'SERVICE_ACCOUNT');
+      const finalSharedDriveId = source ? (source.sharedDriveId || undefined) : (sharedDriveId || undefined);
+
+      if (finalAuthType === 'OAUTH') {
+        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+        remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
+          authType: 'OAUTH',
+          clientId,
+          clientSecret,
+          tokenJson,
+          teamDriveId: finalSharedDriveId,
+        });
+      } else {
+        const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE');
+        if (!serviceAccountFile) {
+          throw new Error('Google Service Account key file is not configured on the platform');
+        }
+        remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
+          serviceAccountFile,
+          teamDriveId: finalSharedDriveId,
+        });
+      }
+
+      const drivePath = source ? (source.drivePath || '').replace(/^\/|\/$/g, '') : '';
+      const cleanSubPath = path ? path.replace(/^\/|\/$/g, '') : '';
+      const cleanPath = drivePath ? (cleanSubPath ? `${drivePath}/${cleanSubPath}` : drivePath) : cleanSubPath;
+      const rcloneFs = cleanPath ? `${remoteName}:${cleanPath}`.replace(/\/$/, '') : `${remoteName}:`;
+
+      this.logger.log(`Executing manual dedupe on: ${rcloneFs} with mode ${mode}`);
+      const result = await this.rcloneService.dedupe(rcloneFs, mode);
+      return { success: true, result };
+    } catch (error: any) {
+      this.logger.error(`Error executing Google Drive dedupe: ${error.message}`);
+      throw new Error(`Failed to dedupe Google Drive path: ${error.message}`);
+    } finally {
+      if (remoteName) {
+        await this.rcloneConfig.cleanupRemotes(tempJobId);
+      }
+    }
+  }
 }

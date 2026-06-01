@@ -203,28 +203,7 @@ export class TransferProcessor extends WorkerHost {
             dstFs = isPull ? gdriveFs : s3Fs;
             const mode = transfer.mode.toLowerCase() as 'copy' | 'sync' | 'move';
 
-            // Deduplicate Google Drive BEFORE transfer starts to ensure a clean source or destination
-            const gdriveFsToDedupe = isPull ? dstFs : srcFs;
-            try {
-              await this.logTransfer(
-                transferId,
-                'INFO',
-                `🧹 Pre-transfer: Cleaning up duplicates on Google Drive path: ${gdriveFsToDedupe}`,
-              );
-              await this.rcloneService.dedupe(gdriveFsToDedupe, 'newest');
-              await this.logTransfer(
-                transferId,
-                'INFO',
-                `🧹 Pre-transfer: Google Drive deduplicated successfully`,
-              );
-            } catch (dedupeErr: any) {
-              this.logger.warn(`Pre-transfer deduplication failed: ${dedupeErr.message}`);
-              await this.logTransfer(
-                transferId,
-                'WARN',
-                `Pre-transfer Google Drive deduplication warning: ${dedupeErr.message}`,
-              );
-            }
+
 
             const result = await this.rcloneService.startTransfer(
               srcFs,
@@ -275,29 +254,7 @@ export class TransferProcessor extends WorkerHost {
           }
 
           // ── Step 6: Mark as completed ─────────────────────────
-          // Deduplicate Google Drive AFTER transfer completes (PULL transfers)
-          if (isPull) {
-            try {
-              await this.logTransfer(
-                transferId,
-                'INFO',
-                `🧹 Post-transfer: Deduplicating Google Drive destination path: ${dstFs}`,
-              );
-              await this.rcloneService.dedupe(dstFs, 'newest');
-              await this.logTransfer(
-                transferId,
-                'INFO',
-                `🧹 Post-transfer: Google Drive destination deduplicated successfully`,
-              );
-            } catch (dedupeErr: any) {
-              this.logger.warn(`Post-transfer deduplication failed: ${dedupeErr.message}`);
-              await this.logTransfer(
-                transferId,
-                'WARN',
-                `Post-transfer Google Drive deduplication warning: ${dedupeErr.message}`,
-              );
-            }
-          }
+
 
           await this.updateTransferStatus(transferId, 'COMPLETED');
           await this.logTransfer(transferId, 'INFO', '✅ Transfer completed successfully');

@@ -82,6 +82,13 @@ export const gdriveApi = {
     sharedDriveId?: string;
     authType?: string;
   }) => apiClient.post('/gdrive/size', data),
+  dedupe: (data: {
+    sourceId: string;
+    path?: string;
+    mode?: 'newest' | 'oldest' | 'rename' | 'skip';
+    sharedDriveId?: string;
+    authType?: string;
+  }) => apiClient.post('/gdrive/dedupe', data),
 };
 
 // Transfers

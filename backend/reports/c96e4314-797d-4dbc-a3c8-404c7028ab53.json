@@ -1,0 +1,30 @@
+{
+  "validationId": "c96e4314-797d-4dbc-a3c8-404c7028ab53",
+  "name": "Marvel-Folder-V1",
+  "oneWay": false,
+  "source": {
+    "name": "Global Service Account",
+    "path": "Audio Collection Internal/Project Marvel/Audio"
+  },
+  "destination": {
+    "customer": "Project-Marvel",
+    "bucket": "humyn-data-providers-prod",
+    "path": "maptix/marvel/work-packages"
+  },
+  "summary": {
+    "srcTotalBytes": "1409875679365",
+    "srcTotalFiles": 10388,
+    "dstTotalBytes": "1381492637493",
+    "dstTotalFiles": 10185,
+    "matchCount": 0,
+    "differCount": 0,
+    "missingSrcCount": 0,
+    "missingDstCount": 0,
+    "errorCount": 0
+  },
+  "match": [],
+  "differ": [],
+  "missingOnSrc": [],
+  "missingOnDst": [],
+  "error": []
+}

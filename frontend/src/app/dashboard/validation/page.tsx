@@ -499,9 +499,13 @@ export default function ValidationPage() {
                             {!v.oneWay && v.missingSrcCount > 0 ? (
                               <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{v.missingSrcCount} unique in S3</span>
                             ) : null}
-                            {v.differCount === 0 && v.missingDstCount === 0 && (v.oneWay || v.missingSrcCount === 0) ? (
+                            {v.differCount === 0 && v.missingDstCount === 0 && (v.oneWay || v.missingSrcCount === 0) && v.srcTotalFiles === v.dstTotalFiles && Number(v.srcTotalBytes) === Number(v.dstTotalBytes) ? (
                               <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>✅ 100% In Sync</span>
-                            ) : null}
+                            ) : (
+                              v.differCount === 0 && v.missingDstCount === 0 && (v.oneWay || v.missingSrcCount === 0) ? (
+                                <span style={{ color: 'var(--accent-amber)', fontWeight: 600 }}>⚠️ Sizing/Count Mismatch</span>
+                              ) : null
+                            )}
                           </div>
                         ) : v.status === 'FAILED' ? (
                           <span style={{ color: 'var(--accent-red)', fontSize: '12px', display: 'flex', alignItems: 'center', gap: '4px' }} title={v.errorMessage}>

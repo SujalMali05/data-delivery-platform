@@ -80,4 +80,24 @@ export class GdriveController {
       body.authType,
     );
   }
+
+  @Post('dedupe')
+  dedupe(
+    @Body()
+    body: {
+      sourceId: string;
+      path?: string;
+      mode?: 'newest' | 'oldest' | 'rename' | 'skip';
+      sharedDriveId?: string;
+      authType?: 'SERVICE_ACCOUNT' | 'OAUTH';
+    },
+  ) {
+    return this.gdriveService.dedupePath(
+      body.sourceId,
+      body.path,
+      body.mode,
+      body.sharedDriveId,
+      body.authType,
+    );
+  }
 }

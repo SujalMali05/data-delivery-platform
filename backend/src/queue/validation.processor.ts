@@ -112,13 +112,40 @@ export class ValidationProcessor extends WorkerHost {
 
       this.logger.log(`Validation sources: Source [${srcFs}] | Destination [${dstFs}]`);
 
-      // Clean up duplicate objects on Google Drive before calculating size or performing check
+      // 3.5 Scan Google Drive source (srcFs) recursively to detect duplicates
+      let duplicates: any[] = [];
+      let duplicatesCount = 0;
       try {
-        this.logger.log(`Cleaning up duplicates on Google Drive source: ${srcFs}`);
-        await this.rcloneService.dedupe(srcFs, 'newest');
-        this.logger.log(`Google Drive source deduplication completed successfully`);
-      } catch (dedupeErr: any) {
-        this.logger.warn(`Deduplication on Google Drive source failed: ${dedupeErr.message}`);
+        this.logger.log(`Scanning Google Drive for duplicates: ${srcFs}`);
+        const listRes = await this.rcloneService.listDirectory(srcFs, '', { recurse: true });
+        const files = (listRes.list || []).filter((item: any) => !item.IsDir);
+        
+        const filesByPath: Record<string, any[]> = {};
+        for (const file of files) {
+          const path = file.Path;
+          if (!filesByPath[path]) {
+            filesByPath[path] = [];
+          }
+          filesByPath[path].push(file);
+        }
+
+        for (const [path, items] of Object.entries(filesByPath)) {
+          if (items.length > 1) {
+            duplicatesCount += (items.length - 1);
+            duplicates.push({
+              path,
+              count: items.length,
+              files: items.map((item: any) => ({
+                id: item.ID,
+                size: item.Size,
+                modTime: item.ModTime,
+              })),
+            });
+          }
+        }
+        this.logger.log(`Scan completed. Found ${duplicatesCount} duplicate file copies.`);
+      } catch (err: any) {
+        this.logger.warn(`Failed to scan Google Drive for duplicates: ${err.message}`);
       }
 
       // 4. Sizing Calculations
@@ -222,12 +249,14 @@ export class ValidationProcessor extends WorkerHost {
           missingSrcCount: missingOnSrc.length,
           missingDstCount: missingOnDst.length,
           errorCount: error.length,
+          duplicatesCount,
         },
         match,
         differ,
         missingOnSrc,
         missingOnDst,
         error,
+        duplicates,
       };
 
       writeFileSync(reportPath, JSON.stringify(detailedReport, null, 2));

@@ -21,7 +21,7 @@ import {
   RefreshCw,
   FileCode,
 } from 'lucide-react';
-import { validationApi } from '@/lib/api-client';
+import { validationApi, gdriveApi } from '@/lib/api-client';
 
 interface ReportDetails {
   validationId: string;
@@ -39,12 +39,14 @@ interface ReportDetails {
     missingSrcCount: number;
     missingDstCount: number;
     errorCount: number;
+    duplicatesCount?: number;
   };
   match: string[];
   differ: string[];
   missingOnSrc: string[];
   missingOnDst: string[];
   error: string[];
+  duplicates?: Array<{ path: string; count: number; files: Array<{ id: string; size: number; modTime: string }> }>;
 }
 
 export default function ValidationReportPage() {
@@ -58,11 +60,37 @@ export default function ValidationReportPage() {
   const [errorMsg, setErrorMsg] = useState('');
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'match' | 'differ' | 'missingOnDst' | 'missingOnSrc' | 'error'>('differ');
+  const [activeTab, setActiveTab] = useState<'match' | 'differ' | 'missingOnDst' | 'missingOnSrc' | 'error' | 'duplicates'>('differ');
   // Filters & Pagination
   const [searchQuery, setSearchQuery] = useState('');
   const [page, setPage] = useState(1);
   const itemsPerPage = 50;
+
+  // Deduplication Modal States
+  const [isDedupeModalOpen, setIsDedupeModalOpen] = useState(false);
+  const [dedupeMode, setDedupeMode] = useState<'rename' | 'newest' | 'oldest' | 'skip'>('rename');
+  const [dedupeLoading, setDedupeLoading] = useState(false);
+  const [dedupeError, setDedupeError] = useState('');
+
+  const handleResolveDuplicates = async () => {
+    setDedupeLoading(true);
+    setDedupeError('');
+    try {
+      await gdriveApi.dedupe({
+        sourceId: metadata.sourceId,
+        path: metadata.sourcePath,
+        mode: dedupeMode,
+      });
+      setIsDedupeModalOpen(false);
+      alert('Deduplication completed successfully! Running verification again is recommended.');
+      fetchData(true);
+    } catch (err: any) {
+      console.error('Failed to deduplicate:', err);
+      setDedupeError(err.response?.data?.message || 'Failed to complete deduplication.');
+    } finally {
+      setDedupeLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchData(true);
@@ -90,10 +118,11 @@ export default function ValidationReportPage() {
         const reportRes = await validationApi.getReport(id);
         setReport(reportRes.data);
 
-        // Default active tab selection logic:
         const rep = reportRes.data;
         if (rep.summary.differCount > 0) {
           setActiveTab('differ');
+        } else if ((rep.summary.duplicatesCount || 0) > 0) {
+          setActiveTab('duplicates');
         } else if (rep.summary.missingDstCount > 0) {
           setActiveTab('missingOnDst');
         } else if (rep.summary.errorCount > 0) {
@@ -162,7 +191,7 @@ export default function ValidationReportPage() {
   }
 
   // Get active list from report based on selected tab
-  const getActiveList = (): string[] => {
+  const getActiveList = (): any[] => {
     switch (activeTab) {
       case 'match':
         return report.match;
@@ -174,6 +203,8 @@ export default function ValidationReportPage() {
         return report.missingOnSrc;
       case 'error':
         return report.error;
+      case 'duplicates':
+        return report.duplicates || [];
       default:
         return [];
     }
@@ -182,9 +213,12 @@ export default function ValidationReportPage() {
   const activeList = getActiveList();
   
   // Filter list
-  const filteredList = activeList.filter((item) =>
-    item.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredList = activeList.filter((item) => {
+    if (typeof item === 'object' && item !== null) {
+      return item.path.toLowerCase().includes(searchQuery.toLowerCase());
+    }
+    return item.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   // Pagination
   const totalItems = filteredList.length;
@@ -227,7 +261,15 @@ export default function ValidationReportPage() {
   const dstTotalBytes = report ? report.summary.dstTotalBytes : (metadata ? metadata.dstTotalBytes : '0');
   const dstTotalFiles = report ? report.summary.dstTotalFiles : (metadata ? metadata.dstTotalFiles : 0);
 
-  const isInSync = isCompleted && differCount === 0 && missingDstCount === 0 && (oneWay || missingSrcCount === 0);
+  const duplicatesCount = report ? (report.summary.duplicatesCount || 0) : 0;
+
+  const isInSync = isCompleted && 
+    differCount === 0 && 
+    missingDstCount === 0 && 
+    (oneWay || missingSrcCount === 0) &&
+    duplicatesCount === 0 &&
+    srcTotalFiles === dstTotalFiles &&
+    Number(srcTotalBytes) === Number(dstTotalBytes);
 
   const getTabLabel = (tab: typeof activeTab) => {
     switch (tab) {
@@ -241,6 +283,8 @@ export default function ValidationReportPage() {
         return `Missing on Drive (${missingSrcCount})`;
       case 'error':
         return `Errors (${errorCount})`;
+      case 'duplicates':
+        return `Duplicates (${duplicatesCount})`;
     }
   };
 
@@ -342,8 +386,37 @@ export default function ValidationReportPage() {
         </div>
       </div>
 
+      {isCompleted && duplicatesCount > 0 && (
+        <div className="glass animate-fadeIn" style={{ padding: '16px 20px', borderRadius: '12px', border: '1px solid rgba(239,68,68,0.3)', background: 'rgba(239,68,68,0.02)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '20px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', flex: 1 }}>
+            <AlertTriangle size={24} color="var(--accent-red)" style={{ marginTop: '2px', flexShrink: 0 }} />
+            <div>
+              <h4 style={{ fontWeight: 600, fontSize: '15px', color: 'var(--text-primary)' }}>Google Drive Duplicates Flagged</h4>
+              <p style={{ fontSize: '13px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.5' }}>
+                We detected <strong>{duplicatesCount}</strong> duplicate file copies in Google Drive. S3 cannot support duplicate file names in the same directory casing, which prevents exact synchronization. Use the tool below to resolve duplicates safely.
+              </p>
+            </div>
+          </div>
+          <button 
+            className="btn-primary" 
+            onClick={() => setIsDedupeModalOpen(true)}
+            style={{ 
+              background: 'linear-gradient(135deg, var(--accent-red), #b91c1c)',
+              border: 'none',
+              color: '#fff',
+              fontWeight: 600,
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px'
+            }}
+          >
+            <RefreshCw size={14} /> Resolve Duplicates
+          </button>
+        </div>
+      )}
+
       {/* Sizing Stats & Counters Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '16px' }}>
         {/* Google Drive Sizing */}
         <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '4px solid var(--accent-blue)' }}>
           <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>Google Drive Size</span>
@@ -396,6 +469,19 @@ export default function ValidationReportPage() {
           </h3>
           <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{oneWay ? 'Audit is one-way' : 'Missing in Drive'}</span>
         </div>
+
+        {/* Duplicates in Drive */}
+        <div
+          className="card"
+          onClick={() => isCompleted && duplicatesCount > 0 && setActiveTab('duplicates')}
+          style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderLeft: '4px solid var(--accent-red)', cursor: (isCompleted && duplicatesCount > 0) ? 'pointer' : 'default' }}
+        >
+          <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', fontWeight: 500 }}>Drive Duplicates</span>
+          <h3 style={{ fontSize: '18px', fontWeight: 700, color: (isCompleted && duplicatesCount > 0) ? 'var(--accent-red)' : 'inherit' }}>
+            {isRunning ? '—' : duplicatesCount}
+          </h3>
+          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Duplicate names</span>
+        </div>
       </div>
 
       {/* Running / Progress State */}
@@ -440,8 +526,9 @@ export default function ValidationReportPage() {
         <div className="glass" style={{ borderRadius: '12px', border: '1px solid var(--border-primary)', overflow: 'hidden', display: 'flex', flexDirection: 'column', flex: 1 }}>
           {/* Tabs Bar */}
           <div style={{ display: 'flex', gap: '4px', borderBottom: '1px solid var(--border-secondary)', padding: '12px 20px 0', background: 'rgba(255,255,255,0.01)', overflowX: 'auto' }}>
-            {(['differ', 'missingOnDst', 'missingOnSrc', 'match', 'error'] as const).map((tab) => {
+            {(['differ', 'missingOnDst', 'missingOnSrc', 'match', 'error', 'duplicates'] as const).map((tab) => {
               if (tab === 'missingOnSrc' && oneWay) return null;
+              if (tab === 'duplicates' && duplicatesCount === 0) return null;
               const isActiveTab = activeTab === tab;
               return (
                 <button
@@ -505,20 +592,56 @@ export default function ValidationReportPage() {
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border-secondary)', background: 'rgba(255,255,255,0.01)', textAlign: 'left' }}>
                     <th style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '60px' }}>#</th>
-                    <th style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Relative File Path</th>
+                    {activeTab === 'duplicates' ? (
+                      <>
+                        <th style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '30%' }}>Relative File Path</th>
+                        <th style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px' }}>Copy Count</th>
+                        <th style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Details (IDs, Sizes & ModTimes)</th>
+                      </>
+                    ) : (
+                      <th style={{ padding: '10px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Relative File Path</th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedList.map((pathName, index) => {
+                  {paginatedList.map((item, index) => {
                     const globalIdx = (page - 1) * itemsPerPage + index + 1;
-                    return (
-                      <tr key={globalIdx} style={{ borderBottom: '1px solid var(--border-secondary)' }} className="glass-hover">
-                        <td style={{ padding: '10px 20px', color: 'var(--text-muted)' }}>{globalIdx}</td>
-                        <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
-                          {pathName}
-                        </td>
-                      </tr>
-                    );
+                    if (activeTab === 'duplicates') {
+                      const duplicateItem = item as { path: string; count: number; files: Array<{ id: string; size: number; modTime: string }> };
+                      return (
+                        <tr key={globalIdx} style={{ borderBottom: '1px solid var(--border-secondary)' }} className="glass-hover">
+                          <td style={{ padding: '10px 20px', color: 'var(--text-muted)' }}>{globalIdx}</td>
+                          <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                            {duplicateItem.path}
+                          </td>
+                          <td style={{ padding: '10px 20px', color: 'var(--accent-red)', fontWeight: 600 }}>
+                            {duplicateItem.count} copies
+                          </td>
+                          <td style={{ padding: '10px 20px', fontSize: '11px' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {duplicateItem.files.map((f, fIdx) => (
+                                <div key={fIdx} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', color: 'var(--text-secondary)' }}>
+                                  <span><strong style={{ color: 'var(--text-tertiary)' }}>Copy {fIdx + 1}:</strong></span>
+                                  <span>ID: <span style={{ fontFamily: 'monospace', background: 'rgba(255,255,255,0.03)', padding: '2px 4px', borderRadius: '4px' }}>{f.id || 'N/A'}</span></span>
+                                  <span>Size: <span>{formatBytes(f.size)}</span></span>
+                                  <span>Modified: <span>{new Date(f.modTime).toLocaleString()}</span></span>
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    } else {
+                      const pathName = item as string;
+                      return (
+                        <tr key={globalIdx} style={{ borderBottom: '1px solid var(--border-secondary)' }} className="glass-hover">
+                          <td style={{ padding: '10px 20px', color: 'var(--text-muted)' }}>{globalIdx}</td>
+                          <td style={{ padding: '10px 20px', fontFamily: 'monospace', color: 'var(--text-primary)', wordBreak: 'break-all' }}>
+                            {pathName}
+                          </td>
+                        </tr>
+                      );
+                    }
                   })}
                 </tbody>
               </table>
@@ -551,6 +674,77 @@ export default function ValidationReportPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {isDedupeModalOpen && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div className="glass" style={{ maxWidth: '500px', width: '100%', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <AlertTriangle color="var(--accent-amber)" /> Resolve Google Drive Duplicates
+            </h3>
+            <p style={{ fontSize: '13px', color: 'var(--text-secondary)', lineHeight: '1.5' }}>
+              Google Drive permits duplicate filenames. Choose a safe strategy to merge or rename duplicates in <strong>{sourcePath || '/'}</strong>.
+            </p>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Deduplication Strategy</label>
+              <select 
+                className="input" 
+                value={dedupeMode} 
+                onChange={(e) => setDedupeMode(e.target.value as any)}
+                style={{ margin: 0 }}
+              >
+                <option value="rename">Rename Duplicates (Safest - Appends -1, -2)</option>
+                <option value="newest">Keep Newest (Deletes older copies)</option>
+                <option value="oldest">Keep Oldest (Deletes newer copies)</option>
+                <option value="skip">Skip (Keep all, do not delete or rename)</option>
+              </select>
+            </div>
+
+            <div style={{ fontSize: '11px', background: 'rgba(255,255,255,0.02)', padding: '10px 14px', borderRadius: '8px', border: '1px solid var(--border-secondary)', color: 'var(--text-tertiary)', lineHeight: '1.5' }}>
+              {dedupeMode === 'rename' && "⚠️ Rename mode will rename all duplicates to prevent data loss. E.g., file.txt becomes file-1.txt. Note: S3 sync will then see these renamed files and delete them during next sync if they aren't in S3."}
+              {dedupeMode === 'newest' && "🔴 Warning: This will permanently delete older duplicate copies of the same files. Only the most recently modified copy will be kept."}
+              {dedupeMode === 'oldest' && "🔴 Warning: This will permanently delete newer duplicate copies of the same files. Only the oldest copy will be kept."}
+              {dedupeMode === 'skip' && "Duplicates will not be touched."}
+            </div>
+
+            {dedupeError && (
+              <p style={{ color: 'var(--accent-red)', fontSize: '12px' }}>{dedupeError}</p>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px', marginTop: '8px' }}>
+              <button 
+                className="btn-secondary" 
+                onClick={() => setIsDedupeModalOpen(false)}
+                disabled={dedupeLoading}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn-primary" 
+                onClick={handleResolveDuplicates}
+                disabled={dedupeLoading}
+                style={{
+                  background: 'linear-gradient(135deg, var(--accent-blue), #2563eb)',
+                  border: 'none',
+                  color: '#fff',
+                  fontWeight: 600,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px'
+                }}
+              >
+                {dedupeLoading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Resolving...
+                  </>
+                ) : (
+                  'Confirm & Run'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
