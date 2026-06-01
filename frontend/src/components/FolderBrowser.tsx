@@ -63,6 +63,17 @@ export default function FolderBrowser({
     }
   }, [isOpen, initialPath]);
 
+  // Prevent background body scrolling when modal is open
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
   const loadDirectory = async (path: string) => {
     setLoading(true);
     setError('');
@@ -142,6 +153,7 @@ export default function FolderBrowser({
 
   return createPortal(
     <div
+      onClick={onClose}
       style={{
         position: 'fixed',
         top: 0,
@@ -158,6 +170,7 @@ export default function FolderBrowser({
       }}
     >
       <div
+        onClick={(e) => e.stopPropagation()}
         className="glass animate-fadeIn"
         style={{
           width: '100%',
@@ -312,8 +325,8 @@ export default function FolderBrowser({
                       padding: '10px 14px',
                       borderRadius: '8px',
                       cursor: 'pointer',
-                      background: isSelected ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
-                      border: isSelected ? '1px solid rgba(99, 102, 241, 0.3)' : '1px solid transparent',
+                      background: isSelected ? 'var(--accent-blue-glow)' : 'transparent',
+                      border: isSelected ? '1px solid var(--accent-blue)' : '1px solid transparent',
                       transition: 'all 0.15s ease',
                     }}
                     className={!isSelected ? 'glass-hover' : ''}
