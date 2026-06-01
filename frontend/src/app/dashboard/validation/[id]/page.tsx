@@ -3,6 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
+import { createPortal } from 'react-dom';
 import {
   ArrowLeft,
   Loader2,
@@ -66,25 +67,72 @@ export default function ValidationReportPage() {
   const [page, setPage] = useState(1);
   const itemsPerPage = 50;
 
+  // Portal mounted state
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Deduplication Modal States
   const [isDedupeModalOpen, setIsDedupeModalOpen] = useState(false);
   const [dedupeMode, setDedupeMode] = useState<'rename' | 'newest' | 'oldest' | 'skip'>('rename');
   const [dedupeLoading, setDedupeLoading] = useState(false);
   const [dedupeError, setDedupeError] = useState('');
+  const [dedupeProgress, setDedupeProgress] = useState(0);
+
+  const [revalidateLoading, setRevalidateLoading] = useState(false);
+
+  const handleRevalidate = async () => {
+    setRevalidateLoading(true);
+    try {
+      const res = await validationApi.create({
+        name: metadata.name,
+        sourceId: metadata.sourceId,
+        sourcePath: metadata.sourcePath,
+        customerId: metadata.customerId,
+        destinationPath: metadata.destinationPath,
+        oneWay: metadata.oneWay,
+      });
+      alert('New validation run triggered successfully! Redirecting to new report page.');
+      router.push(`/dashboard/validation/${res.data.id}`);
+    } catch (err: any) {
+      console.error('Failed to start re-validation:', err);
+      alert('Failed to start a new validation run: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setRevalidateLoading(false);
+    }
+  };
 
   const handleResolveDuplicates = async () => {
     setDedupeLoading(true);
     setDedupeError('');
+    setDedupeProgress(5);
+
+    // Progress simulation
+    const interval = setInterval(() => {
+      setDedupeProgress((prev) => {
+        if (prev >= 90) return prev;
+        return prev + Math.floor(Math.random() * 8) + 2;
+      });
+    }, 1500);
+
     try {
       await gdriveApi.dedupe({
         sourceId: metadata.sourceId,
         path: metadata.sourcePath,
         mode: dedupeMode,
       });
-      setIsDedupeModalOpen(false);
-      alert('Deduplication completed successfully! Running verification again is recommended.');
-      fetchData(true);
+      clearInterval(interval);
+      setDedupeProgress(100);
+
+      setTimeout(() => {
+        setIsDedupeModalOpen(false);
+        alert('Deduplication completed successfully! We will now trigger a new validation run to verify the sync.');
+        handleRevalidate();
+      }, 500);
     } catch (err: any) {
+      clearInterval(interval);
+      setDedupeProgress(0);
       console.error('Failed to deduplicate:', err);
       setDedupeError(err.response?.data?.message || 'Failed to complete deduplication.');
     } finally {
@@ -296,9 +344,15 @@ export default function ValidationReportPage() {
           <ArrowLeft size={16} /> Back to History
         </Link>
         <div style={{ display: 'flex', gap: '10px' }}>
-          <button className="btn-secondary" onClick={() => fetchData(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <RefreshCw size={14} /> Refresh
-          </button>
+          {isCompleted || isFailed ? (
+            <button className="btn-secondary" onClick={handleRevalidate} disabled={revalidateLoading} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {revalidateLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Re-Run Audit
+            </button>
+          ) : (
+            <button className="btn-secondary" onClick={() => fetchData(false)} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <RefreshCw size={14} /> Refresh
+            </button>
+          )}
           <button className="btn-primary" onClick={handleExportJson} disabled={!isCompleted} style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: isCompleted ? 1 : 0.6 }}>
             <Download size={14} /> Export Report (JSON)
           </button>
@@ -677,7 +731,7 @@ export default function ValidationReportPage() {
         </div>
       )}
 
-      {isDedupeModalOpen && (
+      {mounted && isDedupeModalOpen && typeof window !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
           <div className="glass" style={{ maxWidth: '500px', width: '100%', padding: '24px', borderRadius: '16px', border: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <h3 style={{ fontSize: '18px', fontWeight: 700, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -693,6 +747,7 @@ export default function ValidationReportPage() {
                 className="input" 
                 value={dedupeMode} 
                 onChange={(e) => setDedupeMode(e.target.value as any)}
+                disabled={dedupeLoading}
                 style={{ margin: 0 }}
               >
                 <option value="rename">Rename Duplicates (Safest - Appends -1, -2)</option>
@@ -708,6 +763,18 @@ export default function ValidationReportPage() {
               {dedupeMode === 'oldest' && "🔴 Warning: This will permanently delete newer duplicate copies of the same files. Only the oldest copy will be kept."}
               {dedupeMode === 'skip' && "Duplicates will not be touched."}
             </div>
+
+            {dedupeLoading && (
+              <div style={{ marginTop: '4px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
+                  <span>Deduplicating files...</span>
+                  <span>{dedupeProgress}%</span>
+                </div>
+                <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ width: `${dedupeProgress}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-cyan))', borderRadius: '4px', transition: 'width 0.3s ease' }} />
+                </div>
+              </div>
+            )}
 
             {dedupeError && (
               <p style={{ color: 'var(--accent-red)', fontSize: '12px' }}>{dedupeError}</p>
@@ -745,7 +812,8 @@ export default function ValidationReportPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
