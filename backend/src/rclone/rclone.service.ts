@@ -411,6 +411,8 @@ export class RcloneService {
         command: 'dedupe',
         arg: [fs],
         opt: { 'dedupe-mode': mode },
+      }, {
+        timeout: 600000, // 10 minutes timeout for deduplication
       });
       return response.data;
     } catch (error: any) {
