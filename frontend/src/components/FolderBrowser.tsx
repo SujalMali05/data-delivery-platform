@@ -174,11 +174,11 @@ export default function FolderBrowser({
         className="glass animate-fadeIn"
         style={{
           width: '100%',
-          maxWidth: '560px',
+          maxWidth: '800px',
           borderRadius: '16px',
           display: 'flex',
           flexDirection: 'column',
-          maxHeight: '80vh',
+          maxHeight: '85vh',
           boxShadow: '0 12px 48px rgba(0, 0, 0, 0.5)',
           border: '1px solid var(--border-primary)',
         }}
@@ -359,7 +359,7 @@ export default function FolderBrowser({
             alignItems: 'center',
           }}
         >
-          <div style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '480px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             Selected: <span style={{ color: 'var(--text-secondary)' }}>{selectedPath || '/'}</span>
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
