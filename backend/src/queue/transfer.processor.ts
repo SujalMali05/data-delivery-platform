@@ -159,7 +159,23 @@ export class TransferProcessor extends WorkerHost {
             // ── Step 4: Start rclone transfer ─────────────────────
             const isPull = transfer.direction === 'PULL';
             const gdriveFs = `${gdriveRemote}:${transfer.source.drivePath}`;
-            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${transfer.destinationPath}`;
+            let dstPath = transfer.destinationPath || '';
+            const prefixPath = transfer.customer.prefixPath ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+            const cleanDstPath = dstPath.trim().replace(/^\/|\/$/g, '');
+
+            let s3Path = cleanDstPath;
+            if (prefixPath) {
+              if (cleanDstPath === '') {
+                s3Path = prefixPath;
+              } else if (cleanDstPath === prefixPath) {
+                s3Path = prefixPath;
+              } else if (cleanDstPath.startsWith(prefixPath + '/')) {
+                s3Path = cleanDstPath;
+              } else {
+                s3Path = `${prefixPath}/${cleanDstPath}`;
+              }
+            }
+            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
 
             const srcFs = isPull ? s3Fs : gdriveFs;
             const dstFs = isPull ? gdriveFs : s3Fs;

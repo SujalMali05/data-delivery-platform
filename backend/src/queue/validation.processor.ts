@@ -86,8 +86,32 @@ export class ValidationProcessor extends WorkerHost {
         validation.customer.region,
       );
 
-      const srcFs = `${gdriveRemote}:${validation.source.drivePath}/${validation.sourcePath}`.replace(/\/+$/, '');
-      const dstFs = `${s3Remote}:${validation.customer.bucketName}/${validation.customer.prefixPath}/${validation.destinationPath}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
+      let srcPath = validation.sourcePath || '';
+      const isFromRoot = srcPath.startsWith('/');
+      const cleanSrcPath = srcPath.replace(/^\//, '');
+
+      const srcFs = isFromRoot
+        ? `${gdriveRemote}:${cleanSrcPath}`.replace(/\/+$/, '')
+        : `${gdriveRemote}:${validation.source.drivePath}/${cleanSrcPath}`.replace(/\/+$/, '');
+
+      let dstPath = validation.destinationPath || '';
+      const prefixPath = validation.customer.prefixPath ? validation.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+      const cleanDstPath = dstPath.trim().replace(/^\/|\/$/g, '');
+
+      let s3Path = cleanDstPath;
+      if (prefixPath) {
+        if (cleanDstPath === '') {
+          s3Path = prefixPath;
+        } else if (cleanDstPath === prefixPath) {
+          s3Path = prefixPath;
+        } else if (cleanDstPath.startsWith(prefixPath + '/')) {
+          s3Path = cleanDstPath;
+        } else {
+          s3Path = `${prefixPath}/${cleanDstPath}`;
+        }
+      }
+      dstPath = s3Path;
+      const dstFs = `${s3Remote}:${validation.customer.bucketName}/${dstPath}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
 
       this.logger.log(`Validation sources: Source [${srcFs}] | Destination [${dstFs}]`);
 
@@ -175,12 +199,14 @@ export class ValidationProcessor extends WorkerHost {
         oneWay: validation.oneWay,
         source: {
           name: validation.source.name,
-          path: `${validation.source.drivePath}/${validation.sourcePath}`.replace(/\/+$/, ''),
+          path: isFromRoot
+            ? cleanSrcPath
+            : `${validation.source.drivePath}/${cleanSrcPath}`.replace(/\/+$/, ''),
         },
         destination: {
           customer: validation.customer.name,
           bucket: validation.customer.bucketName,
-          path: `${validation.customer.prefixPath}/${validation.destinationPath}`.replace(/\/\/+/g, '/').replace(/\/+$/, ''),
+          path: dstPath.replace(/\/\/+/g, '/').replace(/\/+$/, ''),
         },
         summary: {
           srcTotalBytes: srcBytes.toString(),
