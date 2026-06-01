@@ -766,14 +766,24 @@ export default function ValidationReportPage() {
             </div>
 
             {dedupeLoading && (
-              <div style={{ marginTop: '4px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '6px' }}>
-                  <span>Deduplicating files...</span>
-                  <span>{dedupeProgress}%</span>
+              <div style={{ marginTop: '4px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-secondary)' }}>
+                  <span>
+                    {dedupeMode === 'rename' && "Renaming duplicate files in Google Drive..."}
+                    {dedupeMode === 'newest' && "Deleting older duplicate copies in Google Drive..."}
+                    {dedupeMode === 'oldest' && "Deleting newer duplicate copies in Google Drive..."}
+                    {dedupeMode === 'skip' && "Processing duplicate files..."}
+                  </span>
+                  <span style={{ fontWeight: 600 }}>{dedupeProgress}%</span>
                 </div>
                 <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', overflow: 'hidden' }}>
                   <div style={{ width: `${dedupeProgress}%`, height: '100%', background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-cyan))', borderRadius: '4px', transition: 'width 0.3s ease' }} />
                 </div>
+                {dedupeProgress >= 90 && (
+                  <p style={{ fontSize: '11px', color: 'var(--text-muted)', fontStyle: 'italic', lineHeight: '1.4', animation: 'pulse 2s infinite' }}>
+                    ℹ️ Google Drive API rate-limits deletions. For large directories, deleting duplicate copies may take a few minutes. Please keep this modal open.
+                  </p>
+                )}
               </div>
             )}
 
