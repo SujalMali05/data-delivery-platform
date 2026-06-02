@@ -16,7 +16,18 @@ export default function NewTransferPage() {
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
   const [clickedMode, setClickedMode] = useState<'CREATE' | 'START' | 'QUEUE'>('START');
 
-  const [form, setForm] = useState({
+  const [form, setForm] = useState<{
+    name: string;
+    direction: string;
+    sourceId: string;
+    customerId: string;
+    destinationPath: string;
+    mode: string;
+    concurrency: number | '';
+    checkers: number;
+    retries: number | '';
+    bandwidthLimit: string;
+  }>({
     name: '',
     direction: 'PUSH',
     sourceId: '',
@@ -57,6 +68,8 @@ export default function NewTransferPage() {
     try {
       const response = await transfersApi.create({
         ...form,
+        concurrency: form.concurrency === '' ? 6 : form.concurrency,
+        retries: form.retries === '' ? 50 : form.retries,
         launchMode: clickedMode,
         bandwidthLimit: form.bandwidthLimit || undefined,
       });
@@ -218,13 +231,33 @@ export default function NewTransferPage() {
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
               Concurrency
             </label>
-            <input className="input" type="number" min={1} max={128} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: parseInt(e.target.value) || 6 })} />
+            <input 
+              className="input" 
+              type="number" 
+              min={1} 
+              max={128} 
+              value={form.concurrency} 
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm({ ...form, concurrency: val === '' ? '' : parseInt(val, 10) });
+              }} 
+            />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
               Retries
             </label>
-            <input className="input" type="number" min={1} max={100} value={form.retries} onChange={(e) => setForm({ ...form, retries: parseInt(e.target.value) || 50 })} />
+            <input 
+              className="input" 
+              type="number" 
+              min={1} 
+              max={100} 
+              value={form.retries} 
+              onChange={(e) => {
+                const val = e.target.value;
+                setForm({ ...form, retries: val === '' ? '' : parseInt(val, 10) });
+              }} 
+            />
           </div>
         </div>
 
