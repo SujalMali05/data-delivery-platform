@@ -22,12 +22,18 @@ import {
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
-  { href: '/dashboard/transfers', label: 'Transfers', icon: ArrowLeftRight },
+  {
+    type: 'group',
+    title: 'Data Transfer',
+    items: [
+      { href: '/dashboard/transfers', label: 'Transfers', icon: ArrowLeftRight },
+      { href: '/dashboard/customers', label: 'Customers', icon: Users },
+      { href: '/dashboard/gdrive', label: 'Google Drive', icon: HardDrive },
+    ],
+  },
   { href: '/dashboard/calculator', label: 'Size Calculator', icon: Calculator },
   { href: '/dashboard/s3-browser', label: 'S3 Browser', icon: Database },
   { href: '/dashboard/validation', label: 'Folder Validation', icon: FileCheck },
-  { href: '/dashboard/customers', label: 'Customers', icon: Users },
-  { href: '/dashboard/gdrive', label: 'Google Drive', icon: HardDrive },
   { href: '/dashboard/schedules', label: 'Schedules', icon: CalendarClock },
   { href: '/dashboard/logs', label: 'Logs', icon: ScrollText },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
@@ -148,8 +154,30 @@ export default function DashboardLayout({
         </Link>
 
         {/* Nav Links */}
-        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-          {navItems.map((item) => {
+        <nav style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto' }}>
+          {navItems.map((item: any) => {
+            if (item.type === 'group') {
+              return (
+                <div key={item.title} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                  <div className="sidebar-section-header">{item.title}</div>
+                  {item.items.map((subItem: any) => {
+                    const Icon = subItem.icon;
+                    const active = isActive(subItem.href);
+                    return (
+                      <Link
+                        key={subItem.href}
+                        href={subItem.href}
+                        className={`sidebar-link ${active ? 'active' : ''}`}
+                      >
+                        <Icon size={18} />
+                        {subItem.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              );
+            }
+
             const Icon = item.icon;
             const active = isActive(item.href);
             return (

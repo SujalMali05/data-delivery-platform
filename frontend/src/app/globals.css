@@ -423,6 +423,16 @@ body {
   border: 1px solid rgba(99, 102, 241, 0.2);
 }
 
+.sidebar-section-header {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.08em;
+  padding: 12px 8px 6px;
+  margin-top: 8px;
+}
+
 /* ── Live indicator ────────────────── */
 .live-dot {
   width: 8px;
