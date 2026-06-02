@@ -104,7 +104,7 @@ model Transfer {
   destinationPath String   @map("destination_path")
 
   // Performance Settings
-  concurrency    Int     @default(32)
+  concurrency    Int     @default(6)
   checkers       Int     @default(32)
   retries        Int     @default(50)
   bandwidthLimit String? @map("bandwidth_limit")

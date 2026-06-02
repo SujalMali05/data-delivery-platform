@@ -23,7 +23,7 @@ export default function NewTransferPage() {
     customerId: '',
     destinationPath: '',
     mode: 'COPY',
-    concurrency: 32,
+    concurrency: 6,
     checkers: 32,
     retries: 50,
     bandwidthLimit: '',
@@ -212,14 +212,13 @@ export default function NewTransferPage() {
             <select className="select" value={form.mode} onChange={(e) => setForm({ ...form, mode: e.target.value })}>
               <option value="COPY">COPY</option>
               <option value="SYNC">SYNC</option>
-              <option value="MOVE">MOVE</option>
             </select>
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
               Concurrency
             </label>
-            <input className="input" type="number" min={1} max={128} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: parseInt(e.target.value) || 32 })} />
+            <input className="input" type="number" min={1} max={128} value={form.concurrency} onChange={(e) => setForm({ ...form, concurrency: parseInt(e.target.value) || 6 })} />
           </div>
           <div>
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>

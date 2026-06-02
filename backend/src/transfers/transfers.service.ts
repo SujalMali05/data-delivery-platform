@@ -163,7 +163,7 @@ export class TransfersService implements OnApplicationBootstrap {
         customerId: dto.customerId,
         destinationPath: dto.destinationPath,
         mode: dto.mode || 'COPY',
-        concurrency: dto.concurrency || 32,
+        concurrency: dto.concurrency || 6,
         checkers: dto.checkers || 32,
         retries: dto.retries || 50,
         bandwidthLimit: dto.bandwidthLimit,
