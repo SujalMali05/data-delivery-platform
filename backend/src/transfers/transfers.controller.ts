@@ -13,6 +13,7 @@ import {
 import { Observable } from 'rxjs';
 import { TransfersService } from './transfers.service';
 import { TransferEventsService } from './transfer-events.service';
+import { DryRunService } from './dry-run.service';
 import { CreateTransferDto } from './dto/create-transfer.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
@@ -22,6 +23,7 @@ export class TransfersController {
   constructor(
     private readonly transfersService: TransfersService,
     private readonly transferEvents: TransferEventsService,
+    private readonly dryRunService: DryRunService,
   ) {}
 
   @Get()
@@ -41,6 +43,22 @@ export class TransfersController {
   @Post()
   create(@Body() dto: CreateTransferDto, @Request() req: any) {
     return this.transfersService.create(dto, req.user.id);
+  }
+
+  /**
+   * Run a dry-run sync to preview what would happen before executing
+   */
+  @Post('dry-run')
+  dryRun(@Body() dto: CreateTransferDto) {
+    return this.dryRunService.generateReport({
+      sourceId: dto.sourceId,
+      customerId: dto.customerId,
+      destinationPath: dto.destinationPath,
+      direction: (dto.direction || 'PUSH') as 'PUSH' | 'PULL',
+      checkers: dto.checkers,
+      mode: dto.mode,
+      skipDeletion: dto.skipDeletion,
+    });
   }
 
   @Post(':id/start')

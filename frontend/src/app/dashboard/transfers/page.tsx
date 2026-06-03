@@ -126,6 +126,7 @@ export default function TransfersPage() {
           <thead>
             <tr>
               <th>Transfer</th>
+              <th>Direction</th>
               <th>Mode</th>
               <th>Status</th>
               <th>Progress</th>
@@ -137,13 +138,13 @@ export default function TransfersPage() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '40px' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '40px' }}>
                   <RefreshCw size={20} style={{ color: 'var(--accent-blue)', animation: 'spin 1s linear infinite' }} />
                 </td>
               </tr>
             ) : transfers.length === 0 ? (
               <tr>
-                <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
+                <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
                   No transfers found
                 </td>
               </tr>
@@ -162,6 +163,15 @@ export default function TransfersPage() {
                           : `${t.source?.name} ➔ ${t.customer?.name}`
                         }
                       </div>
+                    </td>
+                    <td>
+                      <span style={{
+                        fontSize: '12px', fontWeight: 500,
+                        display: 'inline-flex', alignItems: 'center', gap: '4px',
+                        color: t.direction === 'PUSH' ? 'var(--accent-blue)' : 'var(--accent-emerald)',
+                      }}>
+                        {t.direction === 'PUSH' ? '⬆ Push' : '⬇ Pull'}
+                      </span>
                     </td>
                     <td>
                       <span style={{ fontSize: '12px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>

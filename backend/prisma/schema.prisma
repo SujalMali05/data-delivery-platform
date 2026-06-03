@@ -108,6 +108,8 @@ model Transfer {
   checkers       Int     @default(32)
   retries        Int     @default(50)
   bandwidthLimit String? @map("bandwidth_limit")
+  skipDeletion   Boolean @default(false) @map("skip_deletion")
+  dryRunReport   Json?   @map("dry_run_report")
 
   // Progress Tracking
   totalBytes       BigInt @default(0) @map("total_bytes")

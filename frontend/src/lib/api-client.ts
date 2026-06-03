@@ -97,6 +97,7 @@ export const transfersApi = {
     apiClient.get('/transfers', { params }),
   get: (id: string) => apiClient.get(`/transfers/${id}`),
   create: (data: any) => apiClient.post('/transfers', data),
+  dryRun: (data: any) => apiClient.post('/transfers/dry-run', data, { timeout: 600000 }),
   start: (id: string) => apiClient.post(`/transfers/${id}/start`),
   queue: (id: string) => apiClient.post(`/transfers/${id}/queue`),
   pause: (id: string) => apiClient.post(`/transfers/${id}/pause`),

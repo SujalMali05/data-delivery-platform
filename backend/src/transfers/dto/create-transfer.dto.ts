@@ -3,6 +3,7 @@ import {
   IsNotEmpty,
   IsOptional,
   IsInt,
+  IsBoolean,
   Min,
   Max,
   IsEnum,
@@ -56,6 +57,10 @@ export class CreateTransferDto {
   @IsOptional()
   bandwidthLimit?: string;
 
+  @IsBoolean()
+  @IsOptional()
+  skipDeletion?: boolean;
+
   @IsString()
   @IsOptional()
   scheduledAt?: string;
@@ -71,4 +76,7 @@ export class CreateTransferDto {
   @IsEnum(['CREATE', 'START', 'QUEUE'])
   @IsOptional()
   launchMode?: 'CREATE' | 'START' | 'QUEUE';
+
+  @IsOptional()
+  dryRunReport?: any;
 }

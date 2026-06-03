@@ -41,8 +41,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-logs/
-backend/logs/
+/logs/
+/backend/logs/
 
 # ── Miscellaneous ─────────────────────────────────────────
 .DS_Store

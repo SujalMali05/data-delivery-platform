@@ -215,6 +215,7 @@ export class TransferProcessor extends WorkerHost {
                 checkers: transfer.checkers,
                 retries: transfer.retries,
                 bandwidthLimit: transfer.bandwidthLimit || undefined,
+                skipDeletion: transfer.skipDeletion || false,
               },
             );
 

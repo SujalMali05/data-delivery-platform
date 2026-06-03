@@ -91,9 +91,15 @@ export class RcloneService {
       checkers?: number;
       retries?: number;
       bandwidthLimit?: string;
+      skipDeletion?: boolean;
     },
   ): Promise<RcloneJobResult> {
-    const endpoint = mode === 'move' ? '/sync/move' : `/sync/${mode}`;
+    // If skipDeletion is enabled for sync, we perform copy instead of sync to prevent deleting any files on destination
+    let effectiveMode = mode;
+    if (options?.skipDeletion && mode === 'sync') {
+      effectiveMode = 'copy';
+    }
+    const endpoint = effectiveMode === 'move' ? '/sync/move' : `/sync/${effectiveMode}`;
 
     const payload: any = {
       srcFs,
@@ -115,15 +121,55 @@ export class RcloneService {
     payload['--s3-chunk-size'] = '64M';
     payload['--fast-list'] = true;
 
-    this.logger.log(`Starting rclone ${mode}: ${srcFs} → ${dstFs} (group: ${group})`);
+    this.logger.log(`Starting rclone ${effectiveMode}: ${srcFs} → ${dstFs} (group: ${group})${options?.skipDeletion ? ' [no-delete]' : ''}`);
 
     try {
       const response = await this.client.post(endpoint, payload);
       this.logger.log(`rclone job started: jobid=${response.data.jobid}`);
       return response.data;
     } catch (error: any) {
-      this.logger.error(`Failed to start rclone ${mode}: ${error.message}`);
-      throw new Error(`rclone ${mode} failed: ${error.response?.data?.error || error.message}`);
+      this.logger.error(`Failed to start rclone ${effectiveMode}: ${error.message}`);
+      throw new Error(`rclone ${effectiveMode} failed: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Start a dry-run copy/sync/move to simulate what would happen without making changes.
+   * Returns stats about files to transfer, delete, etc.
+   */
+  async startDryRun(
+    srcFs: string,
+    dstFs: string,
+    group: string,
+    mode: 'copy' | 'sync' | 'move',
+    options?: { checkers?: number },
+  ): Promise<RcloneJobResult> {
+    const payload: any = {
+      command: mode,
+      arg: [
+        srcFs,
+        dstFs,
+        '--dry-run',
+        '--fast-list',
+        '--drive-chunk-size=64M',
+        '--buffer-size=64M',
+        '-v',
+      ],
+      _async: true,
+      _group: group,
+    };
+
+    if (options?.checkers) payload.arg.push(`--checkers=${options.checkers}`);
+
+    this.logger.log(`Starting rclone dry-run ${mode} via core/command: ${srcFs} → ${dstFs} (group: ${group})`);
+
+    try {
+      const response = await this.client.post('/core/command', payload);
+      this.logger.log(`rclone dry-run job started: jobid=${response.data.jobid}`);
+      return response.data;
+    } catch (error: any) {
+      this.logger.error(`Failed to start rclone dry-run: ${error.message}`);
+      throw new Error(`rclone dry-run failed: ${error.response?.data?.error || error.message}`);
     }
   }
 
@@ -343,23 +389,57 @@ export class RcloneService {
   }
 
   /**
-   * Calculate total size and file count of a remote path recursively
+   * Calculate total size and file count of a remote path recursively using fast list if possible
    */
   async calculateSize(
     fs: string,
     remote: string,
   ): Promise<{ count: number; bytes: number }> {
+    const targetPath = remote ? `${fs}:${remote}` : fs;
     try {
-      const response = await this.client.post('/operations/size', {
-        fs,
-        remote,
+      this.logger.log(`Calculating size fast for: ${targetPath}`);
+      const response = await this.client.post('/core/command', {
+        command: 'size',
+        arg: [targetPath, '--fast-list'],
       }, {
-        timeout: 600000, // 10 minutes timeout for recursive size calculations
+        timeout: 180000, // 3 minutes timeout
       });
-      return response.data;
+
+      const output = response.data.output || '';
+      let count = 0;
+      let bytes = 0;
+      
+      const countMatch = output.match(/Total objects:\s*(\d+)/i);
+      if (countMatch) {
+        count = parseInt(countMatch[1], 10);
+      }
+      
+      const bytesMatch = output.match(/Total size:.*?\((0|[1-9]\d*)\s*Bytes?\)/i);
+      if (bytesMatch) {
+        bytes = parseInt(bytesMatch[1], 10);
+      } else {
+        const bytesMatchAlt = output.match(/\((0|[1-9]\d*)\s*bytes?\)/i);
+        if (bytesMatchAlt) {
+          bytes = parseInt(bytesMatchAlt[1], 10);
+        }
+      }
+      
+      this.logger.log(`Size calculated fast: ${count} objects, ${bytes} bytes`);
+      return { count, bytes };
     } catch (error: any) {
-      this.logger.error(`Failed to calculate size on ${fs} at path ${remote}: ${error.message}`);
-      throw new Error(`rclone size failed: ${error.response?.data?.error || error.message}`);
+      this.logger.warn(`Fast size calculation failed on ${targetPath}: ${error.message}. Falling back to standard operations/size...`);
+      try {
+        const response = await this.client.post('/operations/size', {
+          fs,
+          remote,
+        }, {
+          timeout: 600000, // 10 minutes timeout
+        });
+        return response.data;
+      } catch (fallbackError: any) {
+        this.logger.error(`Failed to calculate size on ${fs} at path ${remote}: ${fallbackError.message}`);
+        throw new Error(`rclone size failed: ${fallbackError.response?.data?.error || fallbackError.message}`);
+      }
     }
   }
 
