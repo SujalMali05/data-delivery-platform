@@ -19,6 +19,7 @@ import {
   Moon,
   FileCheck,
 } from 'lucide-react';
+import { getSavedThemeSettings, saveThemeSettings } from '../../lib/theme';
 
 const navItems = [
   { href: '/dashboard', label: 'Overview', icon: LayoutDashboard },
@@ -56,17 +57,30 @@ export default function DashboardLayout({
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('ddp_theme') as 'dark' | 'light';
-    const initialTheme = savedTheme || 'dark';
-    setTheme(initialTheme);
-    document.documentElement.setAttribute('data-theme', initialTheme);
+    const currentSettings = getSavedThemeSettings();
+    setTheme(currentSettings.mode);
+
+    const syncTheme = () => {
+      const settings = getSavedThemeSettings();
+      setTheme(settings.mode);
+    };
+
+    window.addEventListener('ddp_theme_change', syncTheme);
+    window.addEventListener('storage', syncTheme);
+
+    return () => {
+      window.removeEventListener('ddp_theme_change', syncTheme);
+      window.removeEventListener('storage', syncTheme);
+    };
   }, []);
 
   const toggleTheme = () => {
-    const nextTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(nextTheme);
-    localStorage.setItem('ddp_theme', nextTheme);
-    document.documentElement.setAttribute('data-theme', nextTheme);
+    const settings = getSavedThemeSettings();
+    const nextMode = settings.mode === 'dark' ? 'light' : 'dark';
+    saveThemeSettings({
+      ...settings,
+      mode: nextMode,
+    });
   };
 
   useEffect(() => {
