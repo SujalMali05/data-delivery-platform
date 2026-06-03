@@ -608,11 +608,14 @@ export class RcloneService {
     const files: Array<{ name: string; path: string; size: number; duration: number }> = [];
     let scanned = 0;
 
-    // Concurrency pool with batch size of 10
-    const batchSize = 10;
-    for (let i = 0; i < wavFiles.length; i += batchSize) {
-      const batch = wavFiles.slice(i, i + batchSize);
-      await Promise.all(batch.map(async (file: any) => {
+    // Sliding window concurrency pool (50 parallel workers)
+    const concurrencyLimit = 50;
+    let index = 0;
+    const workers = Array(Math.min(concurrencyLimit, wavFiles.length)).fill(null).map(async () => {
+      while (index < wavFiles.length) {
+        const file = wavFiles[index++];
+        if (!file) break;
+
         let duration = 0;
         try {
           const bytesToFetch = Math.min(4000, file.Size);
@@ -638,8 +641,10 @@ export class RcloneService {
             });
           }
         }
-      }));
-    }
+      }
+    });
+
+    await Promise.all(workers);
 
     const totalDuration = parseFloat(files.reduce((sum, f) => sum + f.duration, 0).toFixed(2));
 
