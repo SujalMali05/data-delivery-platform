@@ -95,13 +95,17 @@ model Transfer {
   mode      TransferMode   @default(COPY)
 
   // Source
-  sourceId String            @map("source_id")
-  source   GoogleDriveSource @relation(fields: [sourceId], references: [id])
+  sourceId   String?            @map("source_id")
+  source     GoogleDriveSource? @relation(fields: [sourceId], references: [id], onDelete: SetNull)
+  sourceName String?            @map("source_name")
+  sourcePath String?            @map("source_path")
 
   // Destination
-  customerId      String @map("customer_id")
-  customer        Customer @relation(fields: [customerId], references: [id])
-  destinationPath String   @map("destination_path")
+  customerId      String?   @map("customer_id")
+  customer        Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customerName    String?   @map("customer_name")
+  customerBucket  String?   @map("customer_bucket")
+  destinationPath String    @map("destination_path")
 
   // Performance Settings
   concurrency    Int     @default(6)

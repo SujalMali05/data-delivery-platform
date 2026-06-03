@@ -224,8 +224,8 @@ export default function TransfersPage() {
                       </Link>
                       <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
                         {t.direction === 'PULL'
-                          ? `${t.customer?.name} ➔ ${t.source?.name}`
-                          : `${t.source?.name} ➔ ${t.customer?.name}`
+                          ? `${t.customer?.name || t.customerName || 'Deleted Customer'} ➔ ${t.source?.name || t.sourceName || 'Deleted Source'}`
+                          : `${t.source?.name || t.sourceName || 'Deleted Source'} ➔ ${t.customer?.name || t.customerName || 'Deleted Customer'}`
                         }
                       </div>
                     </td>

@@ -87,11 +87,6 @@ export class CustomersService {
   async delete(id: string) {
     await this.findById(id);
 
-    // Delete associated transfers first (cascades snapshots and logs)
-    await this.prisma.transfer.deleteMany({
-      where: { customerId: id },
-    });
-
     await this.prisma.customer.delete({ where: { id } });
     this.logger.log(`Customer deleted: ${id}`);
     return { success: true };

@@ -166,8 +166,8 @@ export default function TransferDetailPage() {
           </div>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
             {transfer.direction === 'PULL'
-              ? `${transfer.customer?.bucketName}/${transfer.destinationPath} ➔ ${transfer.source?.drivePath}`
-              : `${transfer.source?.drivePath} ➔ ${transfer.customer?.bucketName}/${transfer.destinationPath}`
+              ? `${transfer.customer?.bucketName || transfer.customerBucket || 'deleted-bucket'}/${transfer.destinationPath} ➔ ${transfer.source?.drivePath || transfer.sourcePath || 'deleted-path'}`
+              : `${transfer.source?.drivePath || transfer.sourcePath || 'deleted-path'} ➔ ${transfer.customer?.bucketName || transfer.customerBucket || 'deleted-bucket'}/${transfer.destinationPath}`
             }
           </p>
         </div>
@@ -304,7 +304,7 @@ export default function TransferDetailPage() {
               ['Created', formatDate(transfer.createdAt)],
               ['Started', transfer.startedAt ? formatDate(transfer.startedAt) : '—'],
               ['Completed', transfer.completedAt ? formatDate(transfer.completedAt) : '—'],
-              ['Customer', transfer.customer?.name],
+              ['Customer', transfer.customer?.name || transfer.customerName || 'Deleted Customer'],
             ].map(([label, value]) => (
               <div key={label as string} style={{ display: 'flex', justifyContent: 'space-between' }}>
                 <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{label}</span>

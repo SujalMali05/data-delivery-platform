@@ -163,12 +163,26 @@ export class TransfersService implements OnApplicationBootstrap {
       status = 'QUEUED';
     }
 
+    // Fetch source and customer details for snapshotting
+    const source = await this.prisma.googleDriveSource.findUnique({
+      where: { id: dto.sourceId },
+      select: { name: true, drivePath: true },
+    });
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: dto.customerId },
+      select: { name: true, bucketName: true },
+    });
+
     const transfer = await this.prisma.transfer.create({
       data: {
         name: dto.name,
         direction: dto.direction || 'PUSH',
         sourceId: dto.sourceId,
+        sourceName: source?.name || null,
+        sourcePath: source?.drivePath || null,
         customerId: dto.customerId,
+        customerName: customer?.name || null,
+        customerBucket: customer?.bucketName || null,
         destinationPath: dto.destinationPath,
         mode: dto.mode || 'COPY',
         concurrency: dto.concurrency || 6,

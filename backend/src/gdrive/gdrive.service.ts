@@ -152,11 +152,6 @@ export class GdriveService implements OnApplicationBootstrap {
    * Delete a Google Drive source
    */
   async deleteSource(id: string) {
-    // Delete associated transfers first (cascades snapshots and logs)
-    await this.prisma.transfer.deleteMany({
-      where: { sourceId: id },
-    });
-
     await this.prisma.googleDriveSource.delete({ where: { id } });
     this.logger.log(`Google Drive source deleted: ${id}`);
     return { success: true };
