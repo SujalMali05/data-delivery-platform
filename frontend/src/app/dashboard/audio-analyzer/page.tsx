@@ -245,7 +245,7 @@ export default function AudioAnalyzerPage() {
   }, [progress]);
 
   return (
-    <div className="animate-fadeIn" style={{ maxWidth: '1020px' }}>
+    <div className="animate-fadeIn" style={{ maxWidth: '1080px' }}>
       <h1 style={{ fontSize: '24px', fontWeight: 700, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
         <Volume2 size={24} color="var(--accent-blue)" />
         Audio Duration Analyzer
@@ -254,11 +254,12 @@ export default function AudioAnalyzerPage() {
         Recursively scan a directory in S3 or Google Drive to sum the total playback duration of all WAV files.
       </p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '32px', alignItems: 'start' }}>
+      {/* Structured Grid Layout: Left is 340px Fixed Setting, Right is Auto Results */}
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '32px', alignItems: 'start' }}>
         
         {/* Left Input Configuration Column */}
-        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-          <h2 style={{ fontSize: '16px', fontWeight: 600, borderBottom: '1px solid var(--border-secondary)', paddingBottom: '12px' }}>
+        <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '28px' }}>
+          <h2 style={{ fontSize: '16px', fontWeight: 600, borderBottom: '1px solid var(--border-secondary)', paddingBottom: '12px', marginBottom: '4px' }}>
             Analysis Target
           </h2>
 
@@ -267,7 +268,7 @@ export default function AudioAnalyzerPage() {
             <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
               Storage Location
             </label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-secondary)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-secondary)' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -277,11 +278,11 @@ export default function AudioAnalyzerPage() {
                   setError('');
                 }}
                 style={{
-                  padding: '10px',
+                  padding: '8px',
                   borderRadius: '6px',
                   border: 'none',
                   background: type === 'S3' ? 'var(--gradient-primary)' : 'transparent',
-                  color: type === 'S3' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  color: type === 'S3' ? '#ffffff' : 'var(--text-secondary)',
                   fontWeight: 600,
                   fontSize: '13px',
                   cursor: 'pointer',
@@ -300,11 +301,11 @@ export default function AudioAnalyzerPage() {
                   setSelectedSourceId('GLOBAL_SERVICE_ACCOUNT');
                 }}
                 style={{
-                  padding: '10px',
+                  padding: '8px',
                   borderRadius: '6px',
                   border: 'none',
                   background: type === 'GDrive' ? 'var(--gradient-primary)' : 'transparent',
-                  color: type === 'GDrive' ? 'var(--text-primary)' : 'var(--text-secondary)',
+                  color: type === 'GDrive' ? '#ffffff' : 'var(--text-secondary)',
                   fontWeight: 600,
                   fontSize: '13px',
                   cursor: 'pointer',
@@ -371,11 +372,11 @@ export default function AudioAnalyzerPage() {
             )}
 
             {/* Path Selection */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
                 Folder Path (Prefix)
               </label>
-              <div style={{ display: 'flex', gap: '8px' }}>
+              <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
                 <input
                   className="input"
                   placeholder={type === 'S3' ? 'e.g., Stark_Maptix/Audio' : 'e.g., Audio/Project Marvel'}
@@ -384,6 +385,7 @@ export default function AudioAnalyzerPage() {
                     setPath(e.target.value);
                     setResult(null);
                   }}
+                  style={{ flex: 1, minWidth: 0 }}
                 />
                 <button
                   type="button"
@@ -399,9 +401,9 @@ export default function AudioAnalyzerPage() {
                     }
                     setIsBrowserOpen(true);
                   }}
-                  style={{ padding: '0 14px', display: 'flex', alignItems: 'center', gap: '6px' }}
+                  style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, fontSize: '13px' }}
                 >
-                  <FolderOpen size={16} />
+                  <FolderOpen size={14} />
                   Browse
                 </button>
               </div>
@@ -417,12 +419,12 @@ export default function AudioAnalyzerPage() {
               type="submit"
               className="btn-primary"
               disabled={loading || (type === 'S3' && !selectedCustomerId) || (type === 'GDrive' && !selectedSourceId)}
-              style={{ opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px' }}
+              style={{ opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', height: '42px', fontSize: '14px', width: '100%' }}
             >
               {loading ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  Analyzing Audio Files...
+                  Analyzing Audio...
                 </>
               ) : (
                 'Analyze WAV Duration'
@@ -523,50 +525,119 @@ export default function AudioAnalyzerPage() {
                   </div>
                 </div>
 
-                {/* Track Details Table */}
+                {/* Track Details Playlist-style List */}
                 {filteredAndSortedTracks.length > 0 ? (
-                  <div className="table-container" style={{ maxHeight: '420px', overflowY: 'auto' }}>
-                    <table>
-                      <thead>
-                        <tr>
-                          <th style={{ cursor: 'pointer' }} onClick={() => toggleSort('path')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              File Path
-                              <ArrowUpDown size={12} />
-                            </div>
-                          </th>
-                          <th style={{ cursor: 'pointer', width: '120px' }} onClick={() => toggleSort('size')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              Size
-                              <ArrowUpDown size={12} />
-                            </div>
-                          </th>
-                          <th style={{ cursor: 'pointer', width: '110px' }} onClick={() => toggleSort('duration')}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                              Duration
-                              <ArrowUpDown size={12} />
-                            </div>
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {filteredAndSortedTracks.map((file, idx) => (
-                          <tr key={idx}>
-                            <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', maxWidth: '480px' }}>
-                                <FileAudio size={16} style={{ color: 'var(--accent-blue)', minWidth: '16px' }} />
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
-                                  <div style={{ fontWeight: 500, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.path}>{file.path}</div>
-                                </div>
+                  <div style={{
+                    border: '1px solid var(--border-secondary)',
+                    borderRadius: '12px',
+                    overflow: 'hidden',
+                    background: 'var(--bg-input)',
+                    maxHeight: '480px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    position: 'relative',
+                  }}>
+                    {/* Sticky Table Header */}
+                    <div style={{
+                      position: 'sticky',
+                      top: 0,
+                      zIndex: 10,
+                      background: 'var(--bg-tertiary)',
+                      borderBottom: '1px solid var(--border-secondary)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '12px 20px',
+                      fontSize: '12px',
+                      fontWeight: 600,
+                      textTransform: 'uppercase',
+                      color: 'var(--text-secondary)',
+                      letterSpacing: '0.05em',
+                    }}>
+                      <div
+                        onClick={() => toggleSort('path')}
+                        style={{ flex: 1, minWidth: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', userSelect: 'none' }}
+                      >
+                        File Path
+                        <ArrowUpDown size={12} style={{ opacity: sortField === 'path' ? 1 : 0.5 }} />
+                      </div>
+                      <div
+                        onClick={() => toggleSort('size')}
+                        style={{ width: '110px', textAlign: 'right', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', userSelect: 'none', paddingRight: '12px' }}
+                      >
+                        Size
+                        <ArrowUpDown size={12} style={{ opacity: sortField === 'size' ? 1 : 0.5 }} />
+                      </div>
+                      <div
+                        onClick={() => toggleSort('duration')}
+                        style={{ width: '100px', textAlign: 'right', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '6px', userSelect: 'none' }}
+                      >
+                        Duration
+                        <ArrowUpDown size={12} style={{ opacity: sortField === 'duration' ? 1 : 0.5 }} />
+                      </div>
+                    </div>
+
+                    {/* Scrollable Rows */}
+                    <div style={{ overflowY: 'auto', flex: 1 }}>
+                      {filteredAndSortedTracks.map((file, idx) => (
+                        <div
+                          key={idx}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            padding: '12px 20px',
+                            borderBottom: idx === filteredAndSortedTracks.length - 1 ? 'none' : '1px solid var(--border-secondary)',
+                            transition: 'background 0.15s ease',
+                            cursor: 'default',
+                            background: 'var(--bg-card)',
+                          }}
+                          className="glass-hover"
+                        >
+                          {/* File Path Column */}
+                          <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: '12px' }}>
+                            <FileAudio size={16} style={{ color: 'var(--accent-blue)', minWidth: '16px', flexShrink: 0 }} />
+                            <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                              <div style={{ fontWeight: 500, fontSize: '13px', color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {file.name}
                               </div>
-                            </td>
-                            <td style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>{formatBytes(file.size)}</td>
-                            <td style={{ fontSize: '13px', fontWeight: 600, color: 'var(--accent-blue)' }}>{formatTrackTime(file.duration)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                              <div
+                                style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                                title={file.path}
+                              >
+                                {file.path}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Size Column */}
+                          <div style={{
+                            width: '110px',
+                            textAlign: 'right',
+                            fontSize: '13px',
+                            color: 'var(--text-secondary)',
+                            whiteSpace: 'nowrap',
+                            fontFamily: 'monospace',
+                            paddingRight: '12px',
+                            flexShrink: 0,
+                          }}>
+                            {formatBytes(file.size)}
+                          </div>
+
+                          {/* Duration Column */}
+                          <div style={{
+                            width: '100px',
+                            textAlign: 'right',
+                            fontSize: '13px',
+                            fontWeight: 600,
+                            color: 'var(--accent-blue)',
+                            whiteSpace: 'nowrap',
+                            fontFamily: 'monospace',
+                            flexShrink: 0,
+                          }}>
+                            {formatTrackTime(file.duration)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 ) : (
                   <div style={{ padding: '40px', border: '1px dashed var(--border-secondary)', borderRadius: '8px', color: 'var(--text-tertiary)', textAlign: 'center' }}>
