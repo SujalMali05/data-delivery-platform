@@ -502,7 +502,7 @@ export class RcloneService {
   }
 
   /**
-   * Fetch a specific range of bytes from a remote file (using rclone cat)
+   * Fetch a specific range of bytes from a remote file (using rclone cat) with auto-retries and backoff
    */
   async fetchFileRange(
     fs: string,
@@ -511,20 +511,32 @@ export class RcloneService {
   ): Promise<Buffer> {
     const cleanFs = fs.endsWith(':') ? fs.slice(0, -1) : fs;
     const targetPath = remote ? `${cleanFs}:${remote}` : fs;
-    try {
-      const response = await this.client.post('/core/command', {
-        command: 'cat',
-        arg: [targetPath, '--count', bytesCount.toString()],
-        returnType: 'STREAM_ONLY_STDOUT',
-      }, {
-        responseType: 'arraybuffer',
-        timeout: 15000, // 15 seconds timeout
-      });
-      return Buffer.from(response.data);
-    } catch (error: any) {
-      this.logger.error(`Failed to fetch file range for ${targetPath}: ${error.message}`);
-      throw error;
+    
+    const maxRetries = 3;
+    let delay = 500;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await this.client.post('/core/command', {
+          command: 'cat',
+          arg: [targetPath, '--count', bytesCount.toString()],
+          returnType: 'STREAM_ONLY_STDOUT',
+        }, {
+          responseType: 'arraybuffer',
+          timeout: 15000, // 15 seconds timeout
+        });
+        return Buffer.from(response.data);
+      } catch (error: any) {
+        this.logger.warn(`Attempt ${attempt} failed to fetch file range for ${targetPath}: ${error.message}`);
+        if (attempt === maxRetries) {
+          this.logger.error(`Failed to fetch file range for ${targetPath} after ${maxRetries} attempts`);
+          throw error;
+        }
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        delay *= 2; // Exponential backoff
+      }
     }
+    throw new Error(`Failed to fetch file range for ${targetPath}`);
   }
 
   /**
@@ -533,13 +545,20 @@ export class RcloneService {
   parseWavDuration(buffer: Buffer, fileSize: number): number {
     if (buffer.length < 44) return 0;
 
-    const riff = buffer.toString('ascii', 0, 4);
-    const wave = buffer.toString('ascii', 8, 12);
-    if (riff !== 'RIFF' || wave !== 'WAVE') {
+    let riffOffset = buffer.indexOf('RIFF');
+    if (riffOffset === -1) {
+      riffOffset = buffer.indexOf('RF64');
+    }
+    if (riffOffset === -1 || riffOffset + 12 > buffer.length) {
+      return 0; // No RIFF or RF64 signature found
+    }
+
+    const wave = buffer.toString('ascii', riffOffset + 8, riffOffset + 12);
+    if (wave !== 'WAVE') {
       return 0; // Not a valid WAV file
     }
 
-    let offset = 12;
+    let offset = riffOffset + 12;
     let byteRate = 0;
     let dataSize = 0;
 
@@ -559,6 +578,10 @@ export class RcloneService {
           break; // Found fmt and data, can stop walking
         }
 
+        if (chunkSize <= 0 || offset + chunkSize > fileSize) {
+          break; // Avoid infinite loops or invalid offsets
+        }
+
         offset += chunkSize;
       }
     } catch (e) {
@@ -567,7 +590,7 @@ export class RcloneService {
 
     if (byteRate > 0) {
       // Handle undefined/invalid chunk size (e.g. streaming WAV files or RF64 chunks written with 0xFFFFFFFF)
-      if (dataSize === 0xffffffff || dataSize >= fileSize) {
+      if (dataSize === 0xffffffff || dataSize === 0 || dataSize >= fileSize) {
         dataSize = Math.max(0, fileSize - offset);
       }
 
@@ -575,7 +598,7 @@ export class RcloneService {
         return dataSize / byteRate;
       }
       // Fallback: estimate based on file size minus standard header length
-      const estimatedDataSize = Math.max(0, fileSize - 44);
+      const estimatedDataSize = Math.max(0, fileSize - (riffOffset + 44));
       return estimatedDataSize / byteRate;
     }
 
@@ -608,8 +631,10 @@ export class RcloneService {
     const files: Array<{ name: string; path: string; size: number; duration: number }> = [];
     let scanned = 0;
 
-    // Sliding window concurrency pool (50 parallel workers)
-    const concurrencyLimit = 50;
+    // Storage-aware concurrency limit to prevent rate limiting (especially on Google Drive)
+    const isGDrive = fs.toLowerCase().includes('gdrive');
+    const concurrencyLimit = isGDrive ? 8 : 20;
+    
     let index = 0;
     const workers = Array(Math.min(concurrencyLimit, wavFiles.length)).fill(null).map(async () => {
       while (index < wavFiles.length) {
@@ -618,7 +643,8 @@ export class RcloneService {
 
         let duration = 0;
         try {
-          const bytesToFetch = Math.min(4000, file.Size);
+          // Fetch up to 64KB to cover large JUNK/LIST/bext metadata headers safely
+          const bytesToFetch = Math.min(65536, file.Size);
           if (bytesToFetch >= 44) {
             const buffer = await this.fetchFileRange(fs, file.Path, bytesToFetch);
             duration = this.parseWavDuration(buffer, file.Size);
