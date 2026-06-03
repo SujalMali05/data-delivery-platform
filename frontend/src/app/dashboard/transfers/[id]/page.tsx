@@ -28,6 +28,7 @@ import {
   CheckCircle2,
   Database,
   Shield,
+  Info,
 } from 'lucide-react';
 
 export default function TransferDetailPage() {
@@ -496,11 +497,11 @@ export default function TransferDetailPage() {
               padding: '14px 18px',
               borderRadius: '12px',
               border: '1px solid',
-              borderColor: transfer.skipDeletion ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-              background: transfer.skipDeletion ? 'rgba(16, 185, 129, 0.03)' : 'rgba(239, 68, 68, 0.03)',
+              borderColor: transfer.skipDeletion ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)',
+              background: transfer.skipDeletion ? 'rgba(16, 185, 129, 0.03)' : 'rgba(59, 130, 246, 0.03)',
               fontSize: '13px',
               fontWeight: 600,
-              color: transfer.skipDeletion ? 'var(--accent-emerald)' : 'var(--accent-red)',
+              color: transfer.skipDeletion ? 'var(--accent-emerald)' : 'var(--accent-blue)',
               display: 'flex',
               alignItems: 'center',
               gap: '8px',
@@ -511,7 +512,7 @@ export default function TransferDetailPage() {
                 </>
               ) : (
                 <>
-                  <AlertTriangle size={16} /> Full Sync Mode Active — files not present in the source were deleted from the destination (affected {transfer.dryRunReport.summary.filesToDelete} file(s)).
+                  <Info size={16} /> Full Sync Mode Active — files not present in the source were deleted from the destination (affected {transfer.dryRunReport.summary.filesToDelete} file(s)).
                 </>
               )}
             </div>

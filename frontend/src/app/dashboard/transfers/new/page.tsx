@@ -19,6 +19,7 @@ import {
   CheckCircle2,
   AlertTriangle,
   Shield,
+  Info,
   ClipboardCheck,
   FolderOpen,
   HardDrive,
@@ -531,7 +532,7 @@ export default function NewTransferPage() {
                       Sync Mode
                     </h3>
                     <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', lineHeight: '1.6', marginTop: '10px' }}>
-                      Mirrors the source to destination exactly. <strong>Destructive!</strong> Files at the destination that do not exist at the source will be deleted. Generates a preview dry-run report.
+                      Mirrors the source to destination exactly. Files at the destination that do not exist at the source are deleted to maintain a perfect sync. Generates a preview dry-run report.
                     </p>
                   </div>
 
@@ -543,11 +544,11 @@ export default function NewTransferPage() {
                     fontWeight: 600,
                     padding: '4px 10px',
                     borderRadius: '8px',
-                    background: 'rgba(239,68,68,0.08)',
-                    color: 'var(--accent-red)',
+                    background: 'rgba(59,130,246,0.08)',
+                    color: 'var(--accent-blue)',
                     alignSelf: 'flex-start',
                   }}>
-                    <AlertTriangle size={12} /> May Evict Destination Files
+                    <Info size={12} /> Standard Mirror Sync
                   </div>
                 </div>
               </div>
@@ -1106,8 +1107,8 @@ export default function NewTransferPage() {
                   padding: '20px',
                   borderRadius: '12px',
                   border: '1px solid',
-                  borderColor: skipDeletion ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-                  background: skipDeletion ? 'rgba(16, 185, 129, 0.03)' : 'rgba(239, 68, 68, 0.03)',
+                  borderColor: skipDeletion ? 'rgba(16, 185, 129, 0.3)' : 'rgba(59, 130, 246, 0.3)',
+                  background: skipDeletion ? 'rgba(16, 185, 129, 0.03)' : 'rgba(59, 130, 246, 0.03)',
                   transition: 'all 0.25s ease',
                 }}>
                   <label style={{
@@ -1132,7 +1133,7 @@ export default function NewTransferPage() {
                       <span style={{
                         fontSize: '14px',
                         fontWeight: 700,
-                        color: skipDeletion ? 'var(--accent-emerald)' : 'var(--accent-red)',
+                        color: skipDeletion ? 'var(--accent-emerald)' : 'var(--accent-blue)',
                       }}>
                         Do not delete anything on destination (Safe Sync Mode)
                       </span>
