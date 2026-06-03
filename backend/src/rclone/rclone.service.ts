@@ -566,6 +566,11 @@ export class RcloneService {
     }
 
     if (byteRate > 0) {
+      // Handle undefined/invalid chunk size (e.g. streaming WAV files or RF64 chunks written with 0xFFFFFFFF)
+      if (dataSize === 0xffffffff || dataSize >= fileSize) {
+        dataSize = Math.max(0, fileSize - offset);
+      }
+
       if (dataSize > 0) {
         return dataSize / byteRate;
       }
