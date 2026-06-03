@@ -509,7 +509,8 @@ export class RcloneService {
     remote: string,
     bytesCount: number,
   ): Promise<Buffer> {
-    const targetPath = remote ? `${fs}:${remote}` : fs;
+    const cleanFs = fs.endsWith(':') ? fs.slice(0, -1) : fs;
+    const targetPath = remote ? `${cleanFs}:${remote}` : fs;
     try {
       const response = await this.client.post('/core/command', {
         command: 'cat',

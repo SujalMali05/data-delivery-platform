@@ -19,6 +19,31 @@ interface CalculationResult {
   skippedCount: number;
 }
 
+const EqualizerAnimation = ({ active = true }: { active?: boolean }) => (
+  <div style={{ display: 'flex', alignItems: 'flex-end', gap: '3px', height: '24px' }}>
+    {[1, 2, 3, 4, 5].map((i) => (
+      <div
+        key={i}
+        style={{
+          width: '3px',
+          height: '100%',
+          background: 'var(--accent-blue)',
+          borderRadius: '2px',
+          animation: active ? `bounce-bar ${0.5 + i * 0.12}s ease-in-out infinite` : 'none',
+          transformOrigin: 'bottom',
+          transform: active ? 'none' : 'scaleY(0.2)',
+        }}
+      />
+    ))}
+    <style dangerouslySetInnerHTML={{__html: `
+      @keyframes bounce-bar {
+        0%, 100% { transform: scaleY(0.2); }
+        50% { transform: scaleY(1); }
+      }
+    `}} />
+  </div>
+);
+
 export default function AudioAnalyzerPage() {
   const [loading, setLoading] = useState(false);
   const [customers, setCustomers] = useState<any[]>([]);
@@ -449,27 +474,34 @@ export default function AudioAnalyzerPage() {
               {/* Stat Cards Grid */}
               <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '16px' }}>
                 {/* Cumulative play time */}
-                <div className="glass" style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Playback Duration</span>
-                  <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent-blue)' }}>
-                    {formatDuration(result.totalDuration)}
-                  </span>
+                <div className="glass" style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Playback Duration</span>
+                    <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent-blue)' }}>
+                      {formatDuration(result.totalDuration)}
+                    </span>
+                  </div>
+                  {result.totalDuration > 0 && <EqualizerAnimation />}
                 </div>
 
                 {/* WAV files count */}
-                <div className="glass" style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>WAV Tracks Found</span>
-                  <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>
-                    {result.wavCount} files
-                  </span>
+                <div className="glass" style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>WAV Tracks Found</span>
+                    <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {result.wavCount} files
+                    </span>
+                  </div>
                 </div>
 
                 {/* Skipped files count */}
-                <div className="glass" style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-primary)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Formats Skipped</span>
-                  <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-secondary)' }}>
-                    {result.skippedCount} files
-                  </span>
+                <div className="glass" style={{ padding: '20px', borderRadius: '14px', border: '1px solid var(--border-primary)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Formats Skipped</span>
+                    <span style={{ fontSize: '22px', fontWeight: 700, color: 'var(--text-secondary)' }}>
+                      {result.skippedCount} files
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -521,11 +553,11 @@ export default function AudioAnalyzerPage() {
                         {filteredAndSortedTracks.map((file, idx) => (
                           <tr key={idx}>
                             <td>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', maxWidth: '480px' }}>
                                 <FileAudio size={16} style={{ color: 'var(--accent-blue)', minWidth: '16px' }} />
-                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  <div style={{ fontWeight: 500, fontSize: '13px' }}>{file.name}</div>
-                                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>{file.path}</div>
+                                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', width: '100%' }}>
+                                  <div style={{ fontWeight: 500, fontSize: '13px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{file.name}</div>
+                                  <div style={{ fontSize: '11px', color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={file.path}>{file.path}</div>
                                 </div>
                               </div>
                             </td>
