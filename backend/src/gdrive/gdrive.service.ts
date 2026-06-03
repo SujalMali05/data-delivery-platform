@@ -331,4 +331,48 @@ export class GdriveService implements OnApplicationBootstrap {
       }
     }
   }
+
+  /**
+   * Calculate cumulative audio duration for all WAV files recursively inside a Google Drive path
+   */
+  async calculateWavDuration(
+    path: string = '',
+    sharedDriveId?: string,
+    authType?: 'SERVICE_ACCOUNT' | 'OAUTH',
+    onProgress?: (progress: { scanned: number; total: number; currentFile: string }) => void,
+  ) {
+    const tempJobId = `wav-duration-${Date.now()}`;
+    let remoteName = '';
+
+    try {
+      if (authType === 'OAUTH') {
+        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+        remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
+          authType: 'OAUTH',
+          clientId,
+          clientSecret,
+          tokenJson,
+          teamDriveId: sharedDriveId || undefined,
+        });
+      } else {
+        const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE');
+        if (!serviceAccountFile) {
+          throw new Error('Google Service Account key file is not configured on the platform');
+        }
+        remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
+          serviceAccountFile,
+          teamDriveId: sharedDriveId || undefined,
+        });
+      }
+
+      return await this.rcloneService.calculateWavDurationOfPath(`${remoteName}:`, path || '', onProgress);
+    } catch (error: any) {
+      this.logger.error(`Error calculating Google Drive WAV duration: ${error.message}`);
+      throw new Error(`Failed to calculate WAV duration: ${error.message}`);
+    } finally {
+      if (remoteName) {
+        await this.rcloneConfig.cleanupRemotes(tempJobId);
+      }
+    }
+  }
 }

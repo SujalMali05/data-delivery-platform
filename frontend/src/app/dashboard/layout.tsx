@@ -18,6 +18,7 @@ import {
   Sun,
   Moon,
   FileCheck,
+  Volume2,
 } from 'lucide-react';
 import { getSavedThemeSettings, saveThemeSettings } from '../../lib/theme';
 
@@ -37,6 +38,7 @@ const navItems = [
     title: 'Utilities & System',
     items: [
       { href: '/dashboard/calculator', label: 'Size Calculator', icon: Calculator },
+      { href: '/dashboard/audio-analyzer', label: 'Audio Analyzer', icon: Volume2 },
       { href: '/dashboard/s3-browser', label: 'S3 Browser', icon: Database },
       { href: '/dashboard/validation', label: 'Folder Validation', icon: FileCheck },
       { href: '/dashboard/schedules', label: 'Schedules', icon: CalendarClock },

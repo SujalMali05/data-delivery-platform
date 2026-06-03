@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   UseGuards,
+  Res,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
@@ -103,5 +104,40 @@ export class CustomersController {
       body.page || 1,
       body.limit || 50,
     );
+  }
+
+  @Post('wav-duration')
+  async calculateWavDuration(
+    @Body()
+    body: {
+      roleArn: string;
+      bucketName: string;
+      region: string;
+      externalId?: string;
+      path?: string;
+    },
+    @Res() res: any,
+  ) {
+    res.setHeader('Content-Type', 'application/x-ndjson');
+    res.setHeader('Transfer-Encoding', 'chunked');
+
+    try {
+      await this.customersService.calculateWavDuration(
+        body.roleArn,
+        body.bucketName,
+        body.region,
+        body.externalId || null,
+        body.path || '',
+        (progress) => {
+          res.write(JSON.stringify({ type: 'progress', ...progress }) + '\n');
+        },
+      ).then((result) => {
+        res.write(JSON.stringify({ type: 'done', result }) + '\n');
+      });
+    } catch (error: any) {
+      res.write(JSON.stringify({ type: 'error', message: error.message }) + '\n');
+    } finally {
+      res.end();
+    }
   }
 }

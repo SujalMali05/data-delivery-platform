@@ -500,4 +500,148 @@ export class RcloneService {
       throw new Error(`rclone dedupe failed: ${error.response?.data?.error || error.message}`);
     }
   }
+
+  /**
+   * Fetch a specific range of bytes from a remote file (using rclone cat)
+   */
+  async fetchFileRange(
+    fs: string,
+    remote: string,
+    bytesCount: number,
+  ): Promise<Buffer> {
+    const targetPath = remote ? `${fs}:${remote}` : fs;
+    try {
+      const response = await this.client.post('/core/command', {
+        command: 'cat',
+        arg: [targetPath, '--count', bytesCount.toString()],
+        returnType: 'STREAM_ONLY_STDOUT',
+      }, {
+        responseType: 'arraybuffer',
+        timeout: 15000, // 15 seconds timeout
+      });
+      return Buffer.from(response.data);
+    } catch (error: any) {
+      this.logger.error(`Failed to fetch file range for ${targetPath}: ${error.message}`);
+      throw error;
+    }
+  }
+
+  /**
+   * Parse WAV file header buffer to calculate audio duration
+   */
+  parseWavDuration(buffer: Buffer, fileSize: number): number {
+    if (buffer.length < 44) return 0;
+
+    const riff = buffer.toString('ascii', 0, 4);
+    const wave = buffer.toString('ascii', 8, 12);
+    if (riff !== 'RIFF' || wave !== 'WAVE') {
+      return 0; // Not a valid WAV file
+    }
+
+    let offset = 12;
+    let byteRate = 0;
+    let dataSize = 0;
+
+    try {
+      // Walk RIFF chunks
+      while (offset + 8 <= buffer.length) {
+        const chunkId = buffer.toString('ascii', offset, offset + 4);
+        const chunkSize = buffer.readUInt32LE(offset + 4);
+        offset += 8;
+
+        if (chunkId === 'fmt ') {
+          if (chunkSize >= 12 && offset + 12 <= buffer.length) {
+            byteRate = buffer.readUInt32LE(offset + 8);
+          }
+        } else if (chunkId === 'data') {
+          dataSize = chunkSize;
+          break; // Found fmt and data, can stop walking
+        }
+
+        offset += chunkSize;
+      }
+    } catch (e) {
+      // Ignore reading errors due to buffer truncation
+    }
+
+    if (byteRate > 0) {
+      if (dataSize > 0) {
+        return dataSize / byteRate;
+      }
+      // Fallback: estimate based on file size minus standard header length
+      const estimatedDataSize = Math.max(0, fileSize - 44);
+      return estimatedDataSize / byteRate;
+    }
+
+    return 0;
+  }
+
+  /**
+   * Scan directory recursively, identify WAV files, and calculate their durations.
+   * Reports progress in real-time.
+   */
+  async calculateWavDurationOfPath(
+    fs: string,
+    remote: string,
+    onProgress?: (progress: { scanned: number; total: number; currentFile: string }) => void,
+  ): Promise<{
+    totalDuration: number;
+    wavCount: number;
+    files: Array<{ name: string; path: string; size: number; duration: number }>;
+    skippedCount: number;
+  }> {
+    this.logger.log(`Listing files for WAV analysis: ${fs} ${remote}`);
+    const dirList = await this.listDirectory(fs, remote, { recurse: true });
+    const list = dirList.list || [];
+
+    const wavFiles = list.filter((item: any) => !item.IsDir && item.Name.toLowerCase().endsWith('.wav'));
+    const skippedCount = list.filter((item: any) => !item.IsDir && !item.Name.toLowerCase().endsWith('.wav')).length;
+
+    this.logger.log(`Found ${wavFiles.length} WAV files to analyze out of ${list.length} total objects`);
+
+    const files: Array<{ name: string; path: string; size: number; duration: number }> = [];
+    let scanned = 0;
+
+    // Concurrency pool with batch size of 10
+    const batchSize = 10;
+    for (let i = 0; i < wavFiles.length; i += batchSize) {
+      const batch = wavFiles.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (file: any) => {
+        let duration = 0;
+        try {
+          const bytesToFetch = Math.min(4000, file.Size);
+          if (bytesToFetch >= 44) {
+            const buffer = await this.fetchFileRange(fs, file.Path, bytesToFetch);
+            duration = this.parseWavDuration(buffer, file.Size);
+          }
+        } catch (error: any) {
+          this.logger.warn(`Failed to parse WAV duration for ${file.Path}: ${error.message}`);
+        } finally {
+          scanned++;
+          files.push({
+            name: file.Name,
+            path: file.Path,
+            size: file.Size,
+            duration: parseFloat(duration.toFixed(2)),
+          });
+          if (onProgress) {
+            onProgress({
+              scanned,
+              total: wavFiles.length,
+              currentFile: file.Name,
+            });
+          }
+        }
+      }));
+    }
+
+    const totalDuration = parseFloat(files.reduce((sum, f) => sum + f.duration, 0).toFixed(2));
+
+    return {
+      totalDuration,
+      wavCount: files.length,
+      files: files.sort((a, b) => a.path.localeCompare(b.path)),
+      skippedCount,
+    };
+  }
 }

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -112,6 +112,50 @@ export const logsApi = {
   list: (params?: { transferId?: string; level?: string; search?: string; page?: number }) =>
     apiClient.get('/logs', { params }),
   byTransfer: (transferId: string) => apiClient.get(`/logs/transfer/${transferId}`),
+};
+
+// WAV Duration Streaming Helper
+export const streamWavDuration = async (
+  type: 'S3' | 'GDrive',
+  payload: any,
+  onEvent: (event: any) => void
+) => {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('ddp_token') : null;
+  const endpoint = type === 'S3' ? '/customers/wav-duration' : '/gdrive/wav-duration';
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.body) throw new Error('ReadableStream not supported by browser');
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (line.trim()) {
+        try {
+          const event = JSON.parse(line);
+          onEvent(event);
+        } catch (e) {
+          // ignore parsing error for partial chunks
+        }
+      }
+    }
+  }
 };
 
 // Validations

@@ -346,4 +346,43 @@ export class CustomersService {
       }
     }
   }
+
+  /**
+   * Calculate cumulative audio duration for all WAV files recursively inside an S3 path
+   */
+  async calculateWavDuration(
+    roleArn: string,
+    bucketName: string,
+    region: string,
+    externalId: string | null,
+    path: string = '',
+    onProgress?: (progress: { scanned: number; total: number; currentFile: string }) => void,
+  ) {
+    const tempJobId = `wav-duration-${Date.now()}`;
+    let remoteName = '';
+
+    try {
+      this.logger.log(`Assuming customer role for WAV duration: ${roleArn}`);
+      const credentials = await this.stsService.assumeRole(
+        roleArn,
+        externalId || undefined,
+      );
+
+      remoteName = await this.rcloneConfig.createS3Remote(
+        tempJobId,
+        credentials,
+        region,
+      );
+
+      const rclonePath = `${bucketName}/${path || ''}`.replace(/\/$/, '');
+      return await this.rcloneService.calculateWavDurationOfPath(`${remoteName}:`, rclonePath, onProgress);
+    } catch (error: any) {
+      this.logger.error(`Error calculating S3 WAV duration: ${error.message}`);
+      throw new Error(`Failed to calculate S3 WAV duration: ${error.message}`);
+    } finally {
+      if (remoteName) {
+        await this.rcloneConfig.cleanupRemotes(tempJobId);
+      }
+    }
+  }
 }
