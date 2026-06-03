@@ -16,21 +16,27 @@ export default function TransfersPage() {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
+  const [directionFilter, setDirectionFilter] = useState<'' | 'PUSH' | 'PULL'>('');
+  const [totalPush, setTotalPush] = useState(0);
+  const [totalPull, setTotalPull] = useState(0);
   const [page, setPage] = useState(1);
 
   const fetchTransfers = useCallback(async () => {
     try {
       const params: any = { page, limit: 20 };
       if (statusFilter) params.status = statusFilter;
+      if (directionFilter) params.direction = directionFilter;
       const response = await transfersApi.list(params);
       setTransfers(response.data.data);
       setTotal(response.data.total);
+      if (response.data.totalPush !== undefined) setTotalPush(response.data.totalPush);
+      if (response.data.totalPull !== undefined) setTotalPull(response.data.totalPull);
     } catch (error: any) {
       console.warn('Failed to fetch transfers:', error.message || error);
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter]);
+  }, [page, statusFilter, directionFilter]);
 
   useEffect(() => {
     fetchTransfers();
@@ -77,6 +83,11 @@ export default function TransfersPage() {
     }
   };
 
+  const handleDirectionChange = (dir: '' | 'PUSH' | 'PULL') => {
+    setDirectionFilter(dir);
+    setPage(1);
+  };
+
   const statuses = ['', 'RUNNING', 'QUEUED', 'COMPLETED', 'FAILED', 'PAUSED', 'CANCELLED', 'SCHEDULED'];
 
   return (
@@ -92,6 +103,60 @@ export default function TransfersPage() {
           <Plus size={16} />
           New Transfer
         </Link>
+      </div>
+
+      {/* Direction Tabs Switcher */}
+      <div style={{
+        display: 'flex',
+        gap: '4px',
+        background: 'rgba(255,255,255,0.02)',
+        padding: '4px',
+        borderRadius: '12px',
+        border: '1px solid var(--border-secondary)',
+        marginBottom: '20px',
+        width: 'fit-content',
+      }}>
+        {[
+          { key: '', label: 'All Transfers', count: totalPush + totalPull },
+          { key: 'PUSH', label: 'Push (GDrive ➔ S3)', count: totalPush },
+          { key: 'PULL', label: 'Pull (S3 ➔ GDrive)', count: totalPull },
+        ].map((tab) => {
+          const isActive = directionFilter === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => handleDirectionChange(tab.key as any)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 18px',
+                borderRadius: '10px',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: 'pointer',
+                border: 'none',
+                background: isActive ? 'var(--bg-primary)' : 'transparent',
+                color: isActive ? 'var(--accent-blue)' : 'var(--text-secondary)',
+                boxShadow: isActive ? '0 4px 12px rgba(0,0,0,0.15)' : 'none',
+                fontFamily: 'inherit',
+                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+              }}
+            >
+              <span>{tab.label}</span>
+              <span style={{
+                fontSize: '11px',
+                padding: '2px 6px',
+                borderRadius: '6px',
+                background: isActive ? 'rgba(59, 130, 246, 0.1)' : 'rgba(255, 255, 255, 0.05)',
+                color: isActive ? 'var(--accent-blue)' : 'var(--text-tertiary)',
+                fontWeight: 700,
+              }}>
+                {tab.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Filters */}

@@ -76,6 +76,7 @@ export class TransfersService implements OnApplicationBootstrap {
 
   async findAll(filters?: {
     status?: string;
+    direction?: string;
     page?: number;
     limit?: number;
   }) {
@@ -87,8 +88,11 @@ export class TransfersService implements OnApplicationBootstrap {
     if (filters?.status) {
       where.status = filters.status;
     }
+    if (filters?.direction) {
+      where.direction = filters.direction;
+    }
 
-    const [transfers, total] = await Promise.all([
+    const [transfers, total, totalPush, totalPull] = await Promise.all([
       this.prisma.transfer.findMany({
         where,
         skip,
@@ -107,6 +111,8 @@ export class TransfersService implements OnApplicationBootstrap {
         },
       }),
       this.prisma.transfer.count({ where }),
+      this.prisma.transfer.count({ where: { direction: 'PUSH' } }),
+      this.prisma.transfer.count({ where: { direction: 'PULL' } }),
     ]);
 
     return {
@@ -116,6 +122,8 @@ export class TransfersService implements OnApplicationBootstrap {
         transferredBytes: t.transferredBytes.toString(),
       })),
       total,
+      totalPush,
+      totalPull,
       page,
       limit,
       totalPages: Math.ceil(total / limit),

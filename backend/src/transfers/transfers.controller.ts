@@ -29,10 +29,11 @@ export class TransfersController {
   @Get()
   findAll(
     @Query('status') status?: string,
+    @Query('direction') direction?: string,
     @Query('page') page?: number,
     @Query('limit') limit?: number,
   ) {
-    return this.transfersService.findAll({ status, page, limit });
+    return this.transfersService.findAll({ status, direction, page, limit });
   }
 
   @Get(':id')
