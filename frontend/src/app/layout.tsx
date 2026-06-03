@@ -19,9 +19,9 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               try {
-                var mode = localStorage.getItem('ddp_theme') || 'dark';
+                var mode = localStorage.getItem('ddp_theme') || 'light';
                 var accent = localStorage.getItem('ddp_theme_accent') || 'indigo';
-                var vibrancy = localStorage.getItem('ddp_theme_vibrancy') || 'slate';
+                var vibrancy = localStorage.getItem('ddp_theme_vibrancy') || 'vibrant';
                 
                 document.documentElement.setAttribute('data-theme', mode);
                 

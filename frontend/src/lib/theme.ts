@@ -162,12 +162,12 @@ export function applyThemeSettings(settings: ThemeSettings) {
 
 export function getSavedThemeSettings(): ThemeSettings {
   if (typeof window === 'undefined') {
-    return { mode: 'dark', accent: 'indigo', vibrancy: 'slate' };
+    return { mode: 'light', accent: 'indigo', vibrancy: 'vibrant' };
   }
 
-  const mode = (localStorage.getItem('ddp_theme') as ThemeMode) || 'dark';
+  const mode = (localStorage.getItem('ddp_theme') as ThemeMode) || 'light';
   const accent = (localStorage.getItem('ddp_theme_accent') as AccentPreset) || 'indigo';
-  const vibrancy = (localStorage.getItem('ddp_theme_vibrancy') as VibrancyProfile) || 'slate';
+  const vibrancy = (localStorage.getItem('ddp_theme_vibrancy') as VibrancyProfile) || 'vibrant';
 
   return { mode, accent, vibrancy };
 }
