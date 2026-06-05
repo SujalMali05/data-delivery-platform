@@ -101,35 +101,4 @@ export class GdriveController {
       body.authType,
     );
   }
-
-  @Post('wav-duration')
-  async calculateWavDuration(
-    @Body()
-    body: {
-      path?: string;
-      sharedDriveId?: string;
-      authType?: 'SERVICE_ACCOUNT' | 'OAUTH';
-    },
-    @Res() res: any,
-  ) {
-    res.setHeader('Content-Type', 'application/x-ndjson');
-    res.setHeader('Transfer-Encoding', 'chunked');
-
-    try {
-      await this.gdriveService.calculateWavDuration(
-        body.path || '',
-        body.sharedDriveId,
-        body.authType,
-        (progress) => {
-          res.write(JSON.stringify({ type: 'progress', ...progress }) + '\n');
-        },
-      ).then((result) => {
-        res.write(JSON.stringify({ type: 'done', result }) + '\n');
-      });
-    } catch (error: any) {
-      res.write(JSON.stringify({ type: 'error', message: error.message }) + '\n');
-    } finally {
-      res.end();
-    }
-  }
 }

@@ -5,9 +5,7 @@ import { ValidationController } from './validation.controller';
 import { VALIDATION_QUEUE } from '../queue/constants';
 
 @Module({
-  imports: [
-    BullModule.registerQueue({ name: VALIDATION_QUEUE }),
-  ],
+  imports: [BullModule.registerQueue({ name: VALIDATION_QUEUE })],
   controllers: [ValidationController],
   providers: [ValidationService],
   exports: [ValidationService],

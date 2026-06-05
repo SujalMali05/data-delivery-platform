@@ -67,7 +67,7 @@ export class TransferProcessor extends WorkerHost {
           }
 
           // ── Step 1: AssumeRole for customer (always needed for monitoring session) ──
-          let credentials = await this.stsService.assumeRole(
+          const credentials = await this.stsService.assumeRole(
             transfer.customer.roleArn,
             transfer.customer.externalId || undefined,
           );
@@ -82,17 +82,22 @@ export class TransferProcessor extends WorkerHost {
           }
 
           // ── Step 2: Check for existing active rclone job (only on first attempt, not on token/network retries) ──
-          const activeJobId = attempts === 0 ? await this.rcloneService.getActiveJobId(transferId) : null;
+          const activeJobId =
+            attempts === 0
+              ? await this.rcloneService.getActiveJobId(transferId)
+              : null;
           let rcloneJobId = activeJobId;
 
           if (activeJobId) {
-            this.logger.log(`Found active background rclone job ${activeJobId} for transfer ${transferId}. Reconnecting...`);
+            this.logger.log(
+              `Found active background rclone job ${activeJobId} for transfer ${transferId}. Reconnecting...`,
+            );
             await this.logTransfer(
               transferId,
               'INFO',
               `Reconnected to active background rclone job (jobId: ${activeJobId})`,
             );
-            
+
             // If the status in database isn't RUNNING, reset it back to RUNNING
             if (transfer.status !== 'RUNNING') {
               await this.updateTransferStatus(transferId, 'RUNNING');
@@ -102,9 +107,12 @@ export class TransferProcessor extends WorkerHost {
             const s3RemoteName = `s3-${transferId}`;
             const gdriveRemoteName = `gdrive-${transferId}`;
 
-            const s3Exists = await this.rcloneService.remoteExists(s3RemoteName);
+            const s3Exists =
+              await this.rcloneService.remoteExists(s3RemoteName);
             if (!s3Exists) {
-              this.logger.log(`Reconnecting: S3 remote ${s3RemoteName} is missing in rclone. Re-creating...`);
+              this.logger.log(
+                `Reconnecting: S3 remote ${s3RemoteName} is missing in rclone. Re-creating...`,
+              );
               await this.rcloneConfig.createS3Remote(
                 transferId,
                 credentials,
@@ -112,17 +120,30 @@ export class TransferProcessor extends WorkerHost {
               );
             }
 
-            const gdriveExists = await this.rcloneService.remoteExists(gdriveRemoteName);
+            const gdriveExists =
+              await this.rcloneService.remoteExists(gdriveRemoteName);
             if (!gdriveExists) {
-              this.logger.log(`Reconnecting: Google Drive remote ${gdriveRemoteName} is missing in rclone. Re-creating...`);
-              const sourceAuthType = transfer.source.authType || 'SERVICE_ACCOUNT';
+              this.logger.log(
+                `Reconnecting: Google Drive remote ${gdriveRemoteName} is missing in rclone. Re-creating...`,
+              );
+              const sourceAuthType =
+                transfer.source.authType || 'SERVICE_ACCOUNT';
               await this.rcloneConfig.createGdriveRemote(transferId, {
                 serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
                 teamDriveId: transfer.source.sharedDriveId || undefined,
                 authType: sourceAuthType,
-                clientId: transfer.source.clientId || process.env.GOOGLE_OAUTH_CLIENT_ID || undefined,
-                clientSecret: transfer.source.clientSecret || process.env.GOOGLE_OAUTH_CLIENT_SECRET || undefined,
-                tokenJson: transfer.source.tokenJson || process.env.GOOGLE_OAUTH_TOKEN || undefined,
+                clientId:
+                  transfer.source.clientId ||
+                  process.env.GOOGLE_OAUTH_CLIENT_ID ||
+                  undefined,
+                clientSecret:
+                  transfer.source.clientSecret ||
+                  process.env.GOOGLE_OAUTH_CLIENT_SECRET ||
+                  undefined,
+                tokenJson:
+                  transfer.source.tokenJson ||
+                  process.env.GOOGLE_OAUTH_TOKEN ||
+                  undefined,
               });
             }
 
@@ -131,8 +152,10 @@ export class TransferProcessor extends WorkerHost {
 
             isPull = transfer.direction === 'PULL';
             const gdriveFs = `${gdriveRemote}:${transfer.source.drivePath}`;
-            let dstPath = transfer.destinationPath || '';
-            const prefixPath = transfer.customer.prefixPath ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+            const dstPath = transfer.destinationPath || '';
+            const prefixPath = transfer.customer.prefixPath
+              ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '')
+              : '';
             const cleanDstPath = dstPath.trim().replace(/^\/|\/$/g, '');
             let s3Path = cleanDstPath;
             if (prefixPath) {
@@ -146,12 +169,20 @@ export class TransferProcessor extends WorkerHost {
                 s3Path = `${prefixPath}/${cleanDstPath}`;
               }
             }
-            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
+            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`
+              .replace(/\/\/+/g, '/')
+              .replace(/\/+$/, '');
             dstFs = isPull ? gdriveFs : s3Fs;
           } else {
             // On first attempt, prevent duplicate processing if already completed/cancelled
-            if (attempts === 0 && (transfer.status === 'COMPLETED' || transfer.status === 'CANCELLED')) {
-              this.logger.warn(`⚠️ Transfer ${transferId} is already in ${transfer.status} state. Skipping process.`);
+            if (
+              attempts === 0 &&
+              (transfer.status === 'COMPLETED' ||
+                transfer.status === 'CANCELLED')
+            ) {
+              this.logger.warn(
+                `⚠️ Transfer ${transferId} is already in ${transfer.status} state. Skipping process.`,
+              );
               return;
             }
 
@@ -162,15 +193,28 @@ export class TransferProcessor extends WorkerHost {
             }
 
             // ── Step 3: Create dynamic rclone remotes ─────────────
-            const sourceAuthType = transfer.source.authType || 'SERVICE_ACCOUNT';
-            gdriveRemote = await this.rcloneConfig.createGdriveRemote(transferId, {
-              serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
-              teamDriveId: transfer.source.sharedDriveId || undefined,
-              authType: sourceAuthType,
-              clientId: transfer.source.clientId || process.env.GOOGLE_OAUTH_CLIENT_ID || undefined,
-              clientSecret: transfer.source.clientSecret || process.env.GOOGLE_OAUTH_CLIENT_SECRET || undefined,
-              tokenJson: transfer.source.tokenJson || process.env.GOOGLE_OAUTH_TOKEN || undefined,
-            });
+            const sourceAuthType =
+              transfer.source.authType || 'SERVICE_ACCOUNT';
+            gdriveRemote = await this.rcloneConfig.createGdriveRemote(
+              transferId,
+              {
+                serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
+                teamDriveId: transfer.source.sharedDriveId || undefined,
+                authType: sourceAuthType,
+                clientId:
+                  transfer.source.clientId ||
+                  process.env.GOOGLE_OAUTH_CLIENT_ID ||
+                  undefined,
+                clientSecret:
+                  transfer.source.clientSecret ||
+                  process.env.GOOGLE_OAUTH_CLIENT_SECRET ||
+                  undefined,
+                tokenJson:
+                  transfer.source.tokenJson ||
+                  process.env.GOOGLE_OAUTH_TOKEN ||
+                  undefined,
+              },
+            );
 
             s3Remote = await this.rcloneConfig.createS3Remote(
               transferId,
@@ -181,8 +225,10 @@ export class TransferProcessor extends WorkerHost {
             // ── Step 4: Start rclone transfer ─────────────────────
             isPull = transfer.direction === 'PULL';
             const gdriveFs = `${gdriveRemote}:${transfer.source.drivePath}`;
-            let dstPath = transfer.destinationPath || '';
-            const prefixPath = transfer.customer.prefixPath ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+            const dstPath = transfer.destinationPath || '';
+            const prefixPath = transfer.customer.prefixPath
+              ? transfer.customer.prefixPath.trim().replace(/^\/|\/$/g, '')
+              : '';
             const cleanDstPath = dstPath.trim().replace(/^\/|\/$/g, '');
 
             let s3Path = cleanDstPath;
@@ -197,13 +243,16 @@ export class TransferProcessor extends WorkerHost {
                 s3Path = `${prefixPath}/${cleanDstPath}`;
               }
             }
-            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
+            const s3Fs = `${s3Remote}:${transfer.customer.bucketName}/${s3Path}`
+              .replace(/\/\/+/g, '/')
+              .replace(/\/+$/, '');
 
             const srcFs = isPull ? s3Fs : gdriveFs;
             dstFs = isPull ? gdriveFs : s3Fs;
-            const mode = transfer.mode.toLowerCase() as 'copy' | 'sync' | 'move';
-
-
+            const mode = transfer.mode.toLowerCase() as
+              | 'copy'
+              | 'sync'
+              | 'move';
 
             const result = await this.rcloneService.startTransfer(
               srcFs,
@@ -239,49 +288,69 @@ export class TransferProcessor extends WorkerHost {
 
           // ── Step 5: Monitor progress until completion ─────────
           if (rcloneJobId === null) {
-            throw new Error('Failed to resolve active or newly started rclone job ID');
+            throw new Error(
+              'Failed to resolve active or newly started rclone job ID',
+            );
           }
-          await this.monitorTransfer(transferId, rcloneJobId, credentials, transfer);
+          await this.monitorTransfer(
+            transferId,
+            rcloneJobId,
+            credentials,
+            transfer,
+          );
 
           // Check current status before marking completed (handles pause/cancel cleanly)
           const currentStatus = await this.prisma.transfer.findUnique({
             where: { id: transferId },
             select: { status: true },
           });
-          if (currentStatus?.status === 'PAUSED' || currentStatus?.status === 'CANCELLED') {
-            this.logger.log(`Job processor exiting cleanly because transfer is in ${currentStatus.status} status.`);
+          if (
+            currentStatus?.status === 'PAUSED' ||
+            currentStatus?.status === 'CANCELLED'
+          ) {
+            this.logger.log(
+              `Job processor exiting cleanly because transfer is in ${currentStatus.status} status.`,
+            );
             await this.transfersService.processNextQueuedTransfer();
             return;
           }
 
           // ── Step 6: Mark as completed ─────────────────────────
 
-
           await this.updateTransferStatus(transferId, 'COMPLETED');
-          await this.logTransfer(transferId, 'INFO', '✅ Transfer completed successfully');
+          await this.logTransfer(
+            transferId,
+            'INFO',
+            '✅ Transfer completed successfully',
+          );
 
           this.logger.log(`✅ Transfer completed: ${transferId}`);
           break;
         } catch (error: any) {
           const errorMsg = error.message || '';
-          const isTokenExpired = errorMsg.includes('ExpiredToken') ||
-                                 errorMsg.includes('token has expired') ||
-                                 errorMsg.includes('Token has expired') ||
-                                 errorMsg.includes('RequestExpired') ||
-                                 errorMsg.includes('SecurityTokenExpired');
+          const isTokenExpired =
+            errorMsg.includes('ExpiredToken') ||
+            errorMsg.includes('token has expired') ||
+            errorMsg.includes('Token has expired') ||
+            errorMsg.includes('RequestExpired') ||
+            errorMsg.includes('SecurityTokenExpired');
 
-          const isNetworkError = errorMsg.includes('no such host') ||
-                                 errorMsg.includes('dial tcp') ||
-                                 errorMsg.includes('connection refused') ||
-                                 errorMsg.includes('network is unreachable') ||
-                                 errorMsg.includes('i/o timeout') ||
-                                 errorMsg.includes('request send failed') ||
-                                 errorMsg.includes('StatusCode: 0') ||
-                                 errorMsg.includes('socket: connection');
+          const isNetworkError =
+            errorMsg.includes('no such host') ||
+            errorMsg.includes('dial tcp') ||
+            errorMsg.includes('connection refused') ||
+            errorMsg.includes('network is unreachable') ||
+            errorMsg.includes('i/o timeout') ||
+            errorMsg.includes('request send failed') ||
+            errorMsg.includes('StatusCode: 0') ||
+            errorMsg.includes('socket: connection');
 
-          if ((isTokenExpired || isNetworkError) && attempts < maxTokenExpiredRetries - 1) {
+          if (
+            (isTokenExpired || isNetworkError) &&
+            attempts < maxTokenExpiredRetries - 1
+          ) {
             attempts++;
-            
+
             if (isTokenExpired) {
               this.logger.warn(
                 `⚠️ Transfer failed due to expired token (attempt ${attempts}/${maxTokenExpiredRetries}). Refreshing credentials and resuming...`,
@@ -305,21 +374,32 @@ export class TransferProcessor extends WorkerHost {
 
             // Clean up old rclone jobs and remotes first before recreating them
             try {
-              const oldActiveJobId = await this.rcloneService.getActiveJobId(transferId);
+              const oldActiveJobId =
+                await this.rcloneService.getActiveJobId(transferId);
               if (oldActiveJobId) {
-                this.logger.log(`Stopping expired/failed rclone job ${oldActiveJobId} before retry...`);
+                this.logger.log(
+                  `Stopping expired/failed rclone job ${oldActiveJobId} before retry...`,
+                );
                 await this.rcloneService.stopJob(oldActiveJobId);
               }
               await this.rcloneConfig.cleanupRemotes(transferId);
             } catch (cleanupErr: any) {
-              this.logger.warn(`Failed to cleanup remotes/jobs during retry: ${cleanupErr.message}`);
+              this.logger.warn(
+                `Failed to cleanup remotes/jobs during retry: ${cleanupErr.message}`,
+              );
             }
 
             continue;
           } else {
-            this.logger.error(`❌ Transfer failed: ${transferId} - ${errorMsg}`);
+            this.logger.error(
+              `❌ Transfer failed: ${transferId} - ${errorMsg}`,
+            );
             await this.updateTransferStatus(transferId, 'FAILED');
-            await this.logTransfer(transferId, 'ERROR', `Transfer failed: ${errorMsg}`);
+            await this.logTransfer(
+              transferId,
+              'ERROR',
+              `Transfer failed: ${errorMsg}`,
+            );
             throw error;
           }
         }
@@ -328,7 +408,11 @@ export class TransferProcessor extends WorkerHost {
       // ── Cleanup ───────────────────────────────────────────
       if (gdriveRemote || s3Remote) {
         await this.rcloneConfig.cleanupRemotes(transferId);
-        await this.logTransfer(transferId, 'INFO', 'Temporary remotes cleaned up');
+        await this.logTransfer(
+          transferId,
+          'INFO',
+          'Temporary remotes cleaned up',
+        );
       }
     }
   }
@@ -355,18 +439,22 @@ export class TransferProcessor extends WorkerHost {
       initialStatsBytes = BigInt(stats.bytes || 0);
       initialStatsFiles = stats.transfers || 0;
     } catch (statsErr: any) {
-      this.logger.warn(`Failed to fetch initial stats for baseline calculation: ${statsErr.message}`);
+      this.logger.warn(
+        `Failed to fetch initial stats for baseline calculation: ${statsErr.message}`,
+      );
     }
 
     const dbTransferredBytes = transfer.transferredBytes || BigInt(0);
     const dbTransferredFiles = transfer.transferredFiles || 0;
 
-    const baselineBytes = dbTransferredBytes > initialStatsBytes 
-      ? dbTransferredBytes - initialStatsBytes 
-      : BigInt(0);
-    const baselineFiles = dbTransferredFiles > initialStatsFiles
-      ? dbTransferredFiles - initialStatsFiles
-      : 0;
+    const baselineBytes =
+      dbTransferredBytes > initialStatsBytes
+        ? dbTransferredBytes - initialStatsBytes
+        : BigInt(0);
+    const baselineFiles =
+      dbTransferredFiles > initialStatsFiles
+        ? dbTransferredFiles - initialStatsFiles
+        : 0;
 
     while (true) {
       // Check job status
@@ -380,10 +468,14 @@ export class TransferProcessor extends WorkerHost {
             select: { status: true },
           });
           if (current?.status === 'PAUSED' || current?.status === 'CANCELLED') {
-            this.logger.log(`Transfer ${transferId} was ${current.status.toLowerCase()} by user. Exiting monitor loop cleanly.`);
+            this.logger.log(
+              `Transfer ${transferId} was ${current.status.toLowerCase()} by user. Exiting monitor loop cleanly.`,
+            );
             return;
           }
-          throw new Error(`rclone job failed: ${jobStatus.error || 'Unknown error'}`);
+          throw new Error(
+            `rclone job failed: ${jobStatus.error || 'Unknown error'}`,
+          );
         }
         break; // Transfer complete
       }
@@ -393,8 +485,10 @@ export class TransferProcessor extends WorkerHost {
         const stats = await this.rcloneService.getStats(transferId);
 
         // Add baseline values to compute absolute progress
-        const absoluteTransferredBytes = baselineBytes + BigInt(stats.bytes || 0);
-        const absoluteTotalBytes = baselineBytes + BigInt(stats.totalBytes || 0);
+        const absoluteTransferredBytes =
+          baselineBytes + BigInt(stats.bytes || 0);
+        const absoluteTotalBytes =
+          baselineBytes + BigInt(stats.totalBytes || 0);
         const absoluteTransferredFiles = baselineFiles + (stats.transfers || 0);
         const absoluteTotalFiles = baselineFiles + (stats.totalTransfers || 0);
 
@@ -439,19 +533,31 @@ export class TransferProcessor extends WorkerHost {
           lastSnapshotTime = Date.now();
         }
       } catch (statsError: any) {
-        this.logger.warn(`Stats poll error for ${transferId}: ${statsError.message}`);
+        this.logger.warn(
+          `Stats poll error for ${transferId}: ${statsError.message}`,
+        );
       }
 
       // Refresh credentials every 50 minutes
-      if (Date.now() - lastCredentialRefreshTime >= CREDENTIAL_REFRESH_INTERVAL_MS) {
+      if (
+        Date.now() - lastCredentialRefreshTime >=
+        CREDENTIAL_REFRESH_INTERVAL_MS
+      ) {
         try {
           this.logger.log(`Refreshing credentials for transfer: ${transferId}`);
           currentCredentials = await this.stsService.assumeRole(
             transfer.customer.roleArn,
             transfer.customer.externalId || undefined,
           );
-          await this.rcloneConfig.refreshS3Credentials(transferId, currentCredentials);
-          await this.logTransfer(transferId, 'INFO', 'STS credentials refreshed');
+          await this.rcloneConfig.refreshS3Credentials(
+            transferId,
+            currentCredentials,
+          );
+          await this.logTransfer(
+            transferId,
+            'INFO',
+            'STS credentials refreshed',
+          );
         } catch (refreshError: any) {
           await this.logTransfer(
             transferId,
@@ -469,7 +575,9 @@ export class TransferProcessor extends WorkerHost {
 
     // ── Final update after loop completion ───────────────────
     try {
-      this.logger.log(`Performing final stats update for transfer: ${transferId}`);
+      this.logger.log(
+        `Performing final stats update for transfer: ${transferId}`,
+      );
       const stats = await this.rcloneService.getStats(transferId);
 
       const absoluteTransferredBytes = baselineBytes + BigInt(stats.bytes || 0);
@@ -502,7 +610,9 @@ export class TransferProcessor extends WorkerHost {
         status: 'RUNNING',
       });
     } catch (statsError: any) {
-      this.logger.warn(`Final stats poll error for ${transferId}: ${statsError.message}`);
+      this.logger.warn(
+        `Final stats poll error for ${transferId}: ${statsError.message}`,
+      );
     }
   }
 
@@ -511,16 +621,28 @@ export class TransferProcessor extends WorkerHost {
     status: 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PAUSED' | 'CANCELLED',
   ) {
     const data: any = { status };
-    if (status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED') {
+    if (
+      status === 'COMPLETED' ||
+      status === 'FAILED' ||
+      status === 'CANCELLED'
+    ) {
       data.completedAt = new Date();
     }
 
     if (status === 'COMPLETED') {
-      const current = await this.prisma.transfer.findUnique({ where: { id: transferId } });
+      const current = await this.prisma.transfer.findUnique({
+        where: { id: transferId },
+      });
       if (current) {
         // Ensure progress shows 100% completed
-        data.transferredBytes = current.totalBytes > BigInt(0) ? current.totalBytes : current.transferredBytes;
-        data.transferredFiles = current.totalFiles > 0 ? current.totalFiles : current.transferredFiles;
+        data.transferredBytes =
+          current.totalBytes > BigInt(0)
+            ? current.totalBytes
+            : current.transferredBytes;
+        data.transferredFiles =
+          current.totalFiles > 0
+            ? current.totalFiles
+            : current.transferredFiles;
         data.currentSpeed = '0 B/s';
         data.eta = 'Completed';
       }
@@ -544,12 +666,20 @@ export class TransferProcessor extends WorkerHost {
       eta: updated.eta || '—',
     });
 
-    if (status === 'COMPLETED' || status === 'FAILED' || status === 'CANCELLED') {
+    if (
+      status === 'COMPLETED' ||
+      status === 'FAILED' ||
+      status === 'CANCELLED'
+    ) {
       await this.transfersService.processNextQueuedTransfer();
     }
   }
 
-  private async logTransfer(transferId: string, level: 'INFO' | 'WARN' | 'ERROR', message: string) {
+  private async logTransfer(
+    transferId: string,
+    level: 'INFO' | 'WARN' | 'ERROR',
+    message: string,
+  ) {
     await this.prisma.transferLog.create({
       data: {
         transferId,

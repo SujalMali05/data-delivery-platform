@@ -27,18 +27,26 @@ export class RcloneConfigService {
       clientId?: string;
       clientSecret?: string;
       tokenJson?: string;
+      rootFolderId?: string;
     } = {},
   ): Promise<string> {
     const remoteName = `gdrive-${jobId}`;
 
     const parameters: Record<string, string> = {
       type: 'drive',
+      pacer_min_sleep: '10ms',
+      pacer_burst: '200',
     };
+
+    if (options.rootFolderId) {
+      parameters['root_folder_id'] = options.rootFolderId;
+    }
 
     if (options.authType === 'OAUTH') {
       // ── OAuth2 User Token auth ──────────────────────────
       if (options.clientId) parameters['client_id'] = options.clientId;
-      if (options.clientSecret) parameters['client_secret'] = options.clientSecret;
+      if (options.clientSecret)
+        parameters['client_secret'] = options.clientSecret;
       if (options.tokenJson) parameters['token'] = options.tokenJson;
       parameters['scope'] = 'drive';
     } else {
@@ -61,7 +69,9 @@ export class RcloneConfigService {
     }
 
     await this.rcloneService.createRemote(remoteName, 'drive', parameters);
-    this.logger.log(`Google Drive remote created: ${remoteName} (auth: ${options.authType || 'SERVICE_ACCOUNT'})`);
+    this.logger.log(
+      `Google Drive remote created: ${remoteName} (auth: ${options.authType || 'SERVICE_ACCOUNT'})`,
+    );
 
     return remoteName;
   }

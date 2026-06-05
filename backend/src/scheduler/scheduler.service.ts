@@ -15,16 +15,26 @@ export class SchedulerService {
   ) {}
 
   private async addToQueueSafe(transferId: string) {
-    const activeJobs = await this.transferQueue.getJobs(['waiting', 'active', 'delayed']);
-    const isAlreadyQueued = activeJobs.some((job) => job.data?.transferId === transferId);
+    const activeJobs = await this.transferQueue.getJobs([
+      'waiting',
+      'active',
+      'delayed',
+    ]);
+    const isAlreadyQueued = activeJobs.some(
+      (job) => job.data?.transferId === transferId,
+    );
 
     if (isAlreadyQueued) {
-      this.logger.log(`Transfer ${transferId} is already in wait/active queue. Skipping duplicate enqueue.`);
+      this.logger.log(
+        `Transfer ${transferId} is already in wait/active queue. Skipping duplicate enqueue.`,
+      );
       return;
     }
 
     await this.transferQueue.add(TRANSFER_JOB, { transferId });
-    this.logger.log(`Transfer ${transferId} added to execution queue from scheduler.`);
+    this.logger.log(
+      `Transfer ${transferId} added to execution queue from scheduler.`,
+    );
   }
 
   /**

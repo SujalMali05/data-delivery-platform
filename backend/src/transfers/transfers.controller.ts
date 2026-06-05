@@ -55,7 +55,7 @@ export class TransfersController {
       sourceId: dto.sourceId,
       customerId: dto.customerId,
       destinationPath: dto.destinationPath,
-      direction: (dto.direction || 'PUSH') as 'PUSH' | 'PULL',
+      direction: dto.direction || 'PUSH',
       checkers: dto.checkers,
       mode: dto.mode,
       skipDeletion: dto.skipDeletion,
@@ -109,10 +109,7 @@ export class TransfersController {
   }
 
   @Get(':id/snapshots')
-  getSnapshots(
-    @Param('id') id: string,
-    @Query('limit') limit?: number,
-  ) {
+  getSnapshots(@Param('id') id: string, @Query('limit') limit?: number) {
     return this.transfersService.getSnapshots(id, limit);
   }
 }

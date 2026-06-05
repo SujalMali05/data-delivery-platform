@@ -56,7 +56,9 @@ export class DashboardService {
         queued: queuedCount,
         failed: failedCount,
         completed: completedCount,
-        totalTransferred: (totalTransferred._sum.transferredBytes || BigInt(0)).toString(),
+        totalTransferred: (
+          totalTransferred._sum.transferredBytes || BigInt(0)
+        ).toString(),
       },
       recentTransfers: recentTransfers.map((t) => ({
         ...t,

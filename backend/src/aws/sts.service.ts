@@ -26,9 +26,13 @@ export class StsService {
         accessKeyId,
         secretAccessKey,
       };
-      this.logger.log('🔑 STSClient initialized with configured IAM User access keys');
+      this.logger.log(
+        '🔑 STSClient initialized with configured IAM User access keys',
+      );
     } else {
-      this.logger.log('☁️ STSClient initialized with environment/instance credentials');
+      this.logger.log(
+        '☁️ STSClient initialized with environment/instance credentials',
+      );
     }
 
     this.stsClient = new STSClient(clientConfig);
@@ -44,12 +48,16 @@ export class StsService {
     sessionName?: string,
     durationSeconds: number = 3600,
   ): Promise<TemporaryCredentials> {
-    const operationalRoleArn = this.configService.get<string>('AWS_OPERATIONAL_ROLE_ARN');
+    const operationalRoleArn = this.configService.get<string>(
+      'AWS_OPERATIONAL_ROLE_ARN',
+    );
 
     let stsClientToUse = this.stsClient;
 
     if (operationalRoleArn) {
-      this.logger.log(`Performing role chaining: assuming operational role first: ${operationalRoleArn}`);
+      this.logger.log(
+        `Performing role chaining: assuming operational role first: ${operationalRoleArn}`,
+      );
       try {
         const opCommand = new AssumeRoleCommand({
           RoleArn: operationalRoleArn,
@@ -64,10 +72,14 @@ export class StsService {
           !opResponse.Credentials?.SecretAccessKey ||
           !opResponse.Credentials?.SessionToken
         ) {
-          throw new Error('STS returned incomplete credentials for operational role');
+          throw new Error(
+            'STS returned incomplete credentials for operational role',
+          );
         }
 
-        this.logger.log(`✅ Successfully assumed operational role. Now assuming customer role.`);
+        this.logger.log(
+          `✅ Successfully assumed operational role. Now assuming customer role.`,
+        );
 
         stsClientToUse = new STSClient({
           region: this.configService.get<string>('AWS_REGION', 'ap-south-1'),
@@ -78,8 +90,12 @@ export class StsService {
           },
         });
       } catch (error: any) {
-        this.logger.error(`❌ Failed to assume operational role: ${error.message}`);
-        const err = new Error(`Operational role AssumeRole failed: ${error.message}`);
+        this.logger.error(
+          `❌ Failed to assume operational role: ${error.message}`,
+        );
+        const err = new Error(
+          `Operational role AssumeRole failed: ${error.message}`,
+        );
         (err as any).step = 'assumeOperationalRole';
         throw err;
       }
@@ -102,14 +118,18 @@ export class StsService {
         !response.Credentials?.SecretAccessKey ||
         !response.Credentials?.SessionToken
       ) {
-        throw new Error('STS returned incomplete credentials for customer role');
+        throw new Error(
+          'STS returned incomplete credentials for customer role',
+        );
       }
 
       const credentials: TemporaryCredentials = {
         accessKeyId: response.Credentials.AccessKeyId,
         secretAccessKey: response.Credentials.SecretAccessKey,
         sessionToken: response.Credentials.SessionToken,
-        expiration: response.Credentials.Expiration || new Date(Date.now() + durationSeconds * 1000),
+        expiration:
+          response.Credentials.Expiration ||
+          new Date(Date.now() + durationSeconds * 1000),
       };
 
       this.logger.log(
@@ -118,8 +138,12 @@ export class StsService {
 
       return credentials;
     } catch (error: any) {
-      this.logger.error(`❌ AssumeRole failed for customer role: ${error.message}`);
-      const err = new Error(`Customer role AssumeRole failed: ${error.message}`);
+      this.logger.error(
+        `❌ AssumeRole failed for customer role: ${error.message}`,
+      );
+      const err = new Error(
+        `Customer role AssumeRole failed: ${error.message}`,
+      );
       (err as any).step = 'assumeCustomerRole';
       throw err;
     }

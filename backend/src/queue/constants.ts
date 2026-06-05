@@ -4,6 +4,7 @@ export const CREDENTIAL_REFRESH_QUEUE = 'credential-refresh-queue';
 export const NOTIFICATION_QUEUE = 'notification-queue';
 export const SCHEDULED_TRANSFER_QUEUE = 'scheduled-transfer-queue';
 export const VALIDATION_QUEUE = 'validation-queue';
+export const WAV_CALCULATION_QUEUE = 'wav-calculation-queue';
 
 // Job names
 export const TRANSFER_JOB = 'process-transfer';
@@ -11,6 +12,7 @@ export const CREDENTIAL_REFRESH_JOB = 'refresh-credentials';
 export const NOTIFICATION_JOB = 'send-notification';
 export const SCHEDULED_TRANSFER_JOB = 'scheduled-transfer';
 export const VALIDATION_JOB = 'process-validation';
+export const WAV_CALCULATION_JOB = 'process-wav-calculation';
 
 // Timing
 export const CREDENTIAL_REFRESH_INTERVAL_MS = 50 * 60 * 1000; // 50 minutes

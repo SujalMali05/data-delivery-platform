@@ -18,6 +18,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { LogsModule } from './logs/logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ValidationModule } from './validation/validation.module';
+import { WavCalculationModule } from './wav-calculation/wav-calculation.module';
 
 @Module({
   imports: [
@@ -67,6 +68,7 @@ import { ValidationModule } from './validation/validation.module';
     LogsModule,
     DashboardModule,
     ValidationModule,
+    WavCalculationModule,
   ],
 })
 export class AppModule {}

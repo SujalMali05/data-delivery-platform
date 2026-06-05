@@ -15,7 +15,9 @@ export class ValidationService {
     @InjectQueue(VALIDATION_QUEUE) private readonly validationQueue: Queue,
   ) {}
 
-  private async resolveNextValidationName(requestedName: string): Promise<string> {
+  private async resolveNextValidationName(
+    requestedName: string,
+  ): Promise<string> {
     // 1. Parse name to see if it already ends in -V\d+
     const versionMatch = requestedName.match(/(.+)[_-][Vv](\d+)$/);
     let baseName = requestedName;
@@ -77,7 +79,9 @@ export class ValidationService {
 
   async create(dto: CreateValidationDto) {
     const finalName = await this.resolveNextValidationName(dto.name);
-    this.logger.log(`Resolved validation name: "${dto.name}" -> "${finalName}"`);
+    this.logger.log(
+      `Resolved validation name: "${dto.name}" -> "${finalName}"`,
+    );
 
     const validation = await this.prisma.validation.create({
       data: {
@@ -138,18 +142,24 @@ export class ValidationService {
     const validation = await this.findById(id);
 
     if (!validation.reportPath) {
-      throw new NotFoundException(`Report path not recorded for validation: ${id}`);
+      throw new NotFoundException(
+        `Report path not recorded for validation: ${id}`,
+      );
     }
 
     if (!existsSync(validation.reportPath)) {
-      throw new NotFoundException(`Detailed JSON report file not found on disk at: ${validation.reportPath}`);
+      throw new NotFoundException(
+        `Detailed JSON report file not found on disk at: ${validation.reportPath}`,
+      );
     }
 
     try {
       const rawData = readFileSync(validation.reportPath, 'utf8');
       return JSON.parse(rawData);
     } catch (err: any) {
-      this.logger.error(`Failed to read or parse validation report: ${err.message}`);
+      this.logger.error(
+        `Failed to read or parse validation report: ${err.message}`,
+      );
       throw new Error(`Failed to load detailed report: ${err.message}`);
     }
   }
@@ -161,9 +171,13 @@ export class ValidationService {
     if (validation.reportPath && existsSync(validation.reportPath)) {
       try {
         unlinkSync(validation.reportPath);
-        this.logger.log(`Deleted validation report file: ${validation.reportPath}`);
+        this.logger.log(
+          `Deleted validation report file: ${validation.reportPath}`,
+        );
       } catch (err: any) {
-        this.logger.warn(`Failed to delete validation report file from disk: ${err.message}`);
+        this.logger.warn(
+          `Failed to delete validation report file from disk: ${err.message}`,
+        );
       }
     }
 

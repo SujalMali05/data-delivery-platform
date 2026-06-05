@@ -114,50 +114,6 @@ export const logsApi = {
   byTransfer: (transferId: string) => apiClient.get(`/logs/transfer/${transferId}`),
 };
 
-// WAV Duration Streaming Helper
-export const streamWavDuration = async (
-  type: 'S3' | 'GDrive',
-  payload: any,
-  onEvent: (event: any) => void
-) => {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('ddp_token') : null;
-  const endpoint = type === 'S3' ? '/customers/wav-duration' : '/gdrive/wav-duration';
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(payload),
-  });
-
-  if (!response.body) throw new Error('ReadableStream not supported by browser');
-
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = '';
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split('\n');
-    buffer = lines.pop() || '';
-
-    for (const line of lines) {
-      if (line.trim()) {
-        try {
-          const event = JSON.parse(line);
-          onEvent(event);
-        } catch (e) {
-          // ignore parsing error for partial chunks
-        }
-      }
-    }
-  }
-};
-
 // Validations
 export const validationApi = {
   list: () => apiClient.get('/validation'),
@@ -166,4 +122,18 @@ export const validationApi = {
   create: (data: { name: string; sourceId: string; sourcePath?: string; customerId: string; destinationPath?: string; oneWay?: boolean }) =>
     apiClient.post('/validation', data),
   delete: (id: string) => apiClient.delete(`/validation/${id}`),
+};
+
+// WAV Calculations History
+export const wavCalculationsApi = {
+  list: () => apiClient.get('/wav-calculations'),
+  get: (id: string) => apiClient.get(`/wav-calculations/${id}`),
+  create: (data: {
+    name: string;
+    storageType: string;
+    targetPath: string;
+    sourceName: string;
+    parameters?: Record<string, any>;
+  }) => apiClient.post('/wav-calculations', data),
+  delete: (id: string) => apiClient.delete(`/wav-calculations/${id}`),
 };

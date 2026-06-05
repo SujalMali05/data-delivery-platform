@@ -23,7 +23,9 @@ export class GdriveService implements OnApplicationBootstrap {
       const healthy = await this.rcloneService.healthCheck();
       return {
         rcloneConnected: healthy,
-        serviceAccountConfigured: !!this.configService.get('GOOGLE_SERVICE_ACCOUNT_FILE'),
+        serviceAccountConfigured: !!this.configService.get(
+          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        ),
       };
     } catch {
       return {
@@ -59,7 +61,9 @@ export class GdriveService implements OnApplicationBootstrap {
       });
       this.logger.log('Global Google Drive sources verified.');
     } catch (err: any) {
-      this.logger.error(`Failed to verify/seed global Google Drive sources: ${err.message}`);
+      this.logger.error(
+        `Failed to verify/seed global Google Drive sources: ${err.message}`,
+      );
     }
   }
 
@@ -69,10 +73,7 @@ export class GdriveService implements OnApplicationBootstrap {
   async getSources() {
     return this.prisma.googleDriveSource.findMany({
       where: {
-        NOT: [
-          { id: 'GLOBAL_SERVICE_ACCOUNT' },
-          { id: 'GLOBAL_OAUTH' },
-        ],
+        NOT: [{ id: 'GLOBAL_SERVICE_ACCOUNT' }, { id: 'GLOBAL_OAUTH' }],
       },
       orderBy: { createdAt: 'desc' },
       include: {
@@ -104,10 +105,14 @@ export class GdriveService implements OnApplicationBootstrap {
    */
   private getOAuthCredsFromEnv() {
     const clientId = this.configService.get<string>('GOOGLE_OAUTH_CLIENT_ID');
-    const clientSecret = this.configService.get<string>('GOOGLE_OAUTH_CLIENT_SECRET');
+    const clientSecret = this.configService.get<string>(
+      'GOOGLE_OAUTH_CLIENT_SECRET',
+    );
     const tokenJson = this.configService.get<string>('GOOGLE_OAUTH_TOKEN');
     if (!clientId || !clientSecret || !tokenJson) {
-      throw new Error('OAuth2 credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_TOKEN) are not configured in .env');
+      throw new Error(
+        'OAuth2 credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_TOKEN) are not configured in .env',
+      );
     }
     return { clientId, clientSecret, tokenJson };
   }
@@ -126,7 +131,11 @@ export class GdriveService implements OnApplicationBootstrap {
     const authType = data.authType || 'SERVICE_ACCOUNT';
 
     // Auto-fill OAuth2 creds from env when authType is OAUTH
-    let oauthCreds: { clientId: string; clientSecret: string; tokenJson: string } | null = null;
+    let oauthCreds: {
+      clientId: string;
+      clientSecret: string;
+      tokenJson: string;
+    } | null = null;
     if (authType === 'OAUTH') {
       oauthCreds = this.getOAuthCredsFromEnv();
     }
@@ -144,7 +153,9 @@ export class GdriveService implements OnApplicationBootstrap {
       },
     });
 
-    this.logger.log(`Google Drive source created: ${source.name} (${source.drivePath}, auth: ${source.authType})`);
+    this.logger.log(
+      `Google Drive source created: ${source.name} (${source.drivePath}, auth: ${source.authType})`,
+    );
     return source;
   }
 
@@ -171,7 +182,8 @@ export class GdriveService implements OnApplicationBootstrap {
 
     try {
       if (authType === 'OAUTH') {
-        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+        const { clientId, clientSecret, tokenJson } =
+          this.getOAuthCredsFromEnv();
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           authType: 'OAUTH',
           clientId,
@@ -180,9 +192,13 @@ export class GdriveService implements OnApplicationBootstrap {
           teamDriveId: sharedDriveId || undefined,
         });
       } else {
-        const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE');
+        const serviceAccountFile = this.configService.get<string>(
+          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        );
         if (!serviceAccountFile) {
-          throw new Error('Google Service Account key file is not configured on the platform');
+          throw new Error(
+            'Google Service Account key file is not configured on the platform',
+          );
         }
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           serviceAccountFile,
@@ -190,8 +206,11 @@ export class GdriveService implements OnApplicationBootstrap {
         });
       }
 
-      const response = await this.rcloneService.listDirectory(`${remoteName}:`, path || '');
-      
+      const response = await this.rcloneService.listDirectory(
+        `${remoteName}:`,
+        path || '',
+      );
+
       const list = response.list || [];
       return list
         .filter((item: any) => item.IsDir)
@@ -223,7 +242,8 @@ export class GdriveService implements OnApplicationBootstrap {
 
     try {
       if (authType === 'OAUTH') {
-        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+        const { clientId, clientSecret, tokenJson } =
+          this.getOAuthCredsFromEnv();
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           authType: 'OAUTH',
           clientId,
@@ -232,9 +252,13 @@ export class GdriveService implements OnApplicationBootstrap {
           teamDriveId: sharedDriveId || undefined,
         });
       } else {
-        const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE');
+        const serviceAccountFile = this.configService.get<string>(
+          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        );
         if (!serviceAccountFile) {
-          throw new Error('Google Service Account key file is not configured on the platform');
+          throw new Error(
+            'Google Service Account key file is not configured on the platform',
+          );
         }
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           serviceAccountFile,
@@ -242,10 +266,14 @@ export class GdriveService implements OnApplicationBootstrap {
         });
       }
 
-      const rcloneFs = path ? `${remoteName}:${path}`.replace(/\/$/, '') : `${remoteName}:`;
+      const rcloneFs = path
+        ? `${remoteName}:${path}`.replace(/\/$/, '')
+        : `${remoteName}:`;
       return await this.rcloneService.calculateSize(rcloneFs, '');
     } catch (error: any) {
-      this.logger.error(`Error calculating Google Drive size: ${error.message}`);
+      this.logger.error(
+        `Error calculating Google Drive size: ${error.message}`,
+      );
       throw new Error(`Failed to calculate size: ${error.message}`);
     } finally {
       if (remoteName) {
@@ -270,11 +298,17 @@ export class GdriveService implements OnApplicationBootstrap {
     try {
       let source: any = null;
       if (sourceId) {
-        source = await this.prisma.googleDriveSource.findUnique({ where: { id: sourceId } });
+        source = await this.prisma.googleDriveSource.findUnique({
+          where: { id: sourceId },
+        });
       }
 
-      let finalAuthType = source ? (source.authType || 'SERVICE_ACCOUNT') : (authType || 'SERVICE_ACCOUNT');
-      const finalSharedDriveId = source ? (source.sharedDriveId || undefined) : (sharedDriveId || undefined);
+      let finalAuthType = source
+        ? source.authType || 'SERVICE_ACCOUNT'
+        : authType || 'SERVICE_ACCOUNT';
+      const finalSharedDriveId = source
+        ? source.sharedDriveId || undefined
+        : sharedDriveId || undefined;
 
       const hasEnvOAuth = !!(
         this.configService.get('GOOGLE_OAUTH_CLIENT_ID') &&
@@ -284,17 +318,32 @@ export class GdriveService implements OnApplicationBootstrap {
 
       // Force OAUTH for deduplication if it's a global source or we have OAuth credentials and are dealing with a service account
       // that cannot delete/rename files in personal My Drives.
-      if (hasEnvOAuth && (sourceId === 'GLOBAL_SERVICE_ACCOUNT' || sourceId === 'GLOBAL_OAUTH' || finalAuthType === 'SERVICE_ACCOUNT')) {
-        this.logger.log(`Using OAuth2 credentials for manual deduplication on source: ${sourceId}`);
+      if (
+        hasEnvOAuth &&
+        (sourceId === 'GLOBAL_SERVICE_ACCOUNT' ||
+          sourceId === 'GLOBAL_OAUTH' ||
+          finalAuthType === 'SERVICE_ACCOUNT')
+      ) {
+        this.logger.log(
+          `Using OAuth2 credentials for manual deduplication on source: ${sourceId}`,
+        );
         finalAuthType = 'OAUTH';
       }
 
       if (finalAuthType === 'OAUTH') {
-        const clientId = source?.clientId || this.configService.get<string>('GOOGLE_OAUTH_CLIENT_ID');
-        const clientSecret = source?.clientSecret || this.configService.get<string>('GOOGLE_OAUTH_CLIENT_SECRET');
-        const tokenJson = source?.tokenJson || this.configService.get<string>('GOOGLE_OAUTH_TOKEN');
+        const clientId =
+          source?.clientId ||
+          this.configService.get<string>('GOOGLE_OAUTH_CLIENT_ID');
+        const clientSecret =
+          source?.clientSecret ||
+          this.configService.get<string>('GOOGLE_OAUTH_CLIENT_SECRET');
+        const tokenJson =
+          source?.tokenJson ||
+          this.configService.get<string>('GOOGLE_OAUTH_TOKEN');
         if (!clientId || !clientSecret || !tokenJson) {
-          throw new Error('OAuth2 credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_TOKEN) are not configured');
+          throw new Error(
+            'OAuth2 credentials (GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, GOOGLE_OAUTH_TOKEN) are not configured',
+          );
         }
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           authType: 'OAUTH',
@@ -304,9 +353,13 @@ export class GdriveService implements OnApplicationBootstrap {
           teamDriveId: finalSharedDriveId,
         });
       } else {
-        const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE');
+        const serviceAccountFile = this.configService.get<string>(
+          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        );
         if (!serviceAccountFile) {
-          throw new Error('Google Service Account key file is not configured on the platform');
+          throw new Error(
+            'Google Service Account key file is not configured on the platform',
+          );
         }
         remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           serviceAccountFile,
@@ -314,16 +367,28 @@ export class GdriveService implements OnApplicationBootstrap {
         });
       }
 
-      const drivePath = source ? (source.drivePath || '').replace(/^\/|\/$/g, '') : '';
+      const drivePath = source
+        ? (source.drivePath || '').replace(/^\/|\/$/g, '')
+        : '';
       const cleanSubPath = path ? path.replace(/^\/|\/$/g, '') : '';
-      const cleanPath = drivePath ? (cleanSubPath ? `${drivePath}/${cleanSubPath}` : drivePath) : cleanSubPath;
-      const rcloneFs = cleanPath ? `${remoteName}:${cleanPath}`.replace(/\/$/, '') : `${remoteName}:`;
+      const cleanPath = drivePath
+        ? cleanSubPath
+          ? `${drivePath}/${cleanSubPath}`
+          : drivePath
+        : cleanSubPath;
+      const rcloneFs = cleanPath
+        ? `${remoteName}:${cleanPath}`.replace(/\/$/, '')
+        : `${remoteName}:`;
 
-      this.logger.log(`Executing manual dedupe on: ${rcloneFs} with mode ${mode}`);
+      this.logger.log(
+        `Executing manual dedupe on: ${rcloneFs} with mode ${mode}`,
+      );
       const result = await this.rcloneService.dedupe(rcloneFs, mode);
       return { success: true, result };
     } catch (error: any) {
-      this.logger.error(`Error executing Google Drive dedupe: ${error.message}`);
+      this.logger.error(
+        `Error executing Google Drive dedupe: ${error.message}`,
+      );
       throw new Error(`Failed to dedupe Google Drive path: ${error.message}`);
     } finally {
       if (remoteName) {
@@ -339,15 +404,23 @@ export class GdriveService implements OnApplicationBootstrap {
     path: string = '',
     sharedDriveId?: string,
     authType?: 'SERVICE_ACCOUNT' | 'OAUTH',
-    onProgress?: (progress: { scanned: number; total: number; currentFile: string }) => void,
+    onProgress?: (progress: {
+      scanned: number;
+      total: number;
+      currentFile: string;
+    }) => void,
   ) {
-    const tempJobId = `wav-duration-${Date.now()}`;
-    let remoteName = '';
+    const tempJobId = `wav-duration-temp-${Date.now()}`;
+    const runJobId = `wav-duration-run-${Date.now()}`;
+    let tempRemoteName = '';
+    let runRemoteName = '';
 
     try {
+      // 1. Create a temporary remote to resolve the path ID
       if (authType === 'OAUTH') {
-        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
-        remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
+        const { clientId, clientSecret, tokenJson } =
+          this.getOAuthCredsFromEnv();
+        tempRemoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           authType: 'OAUTH',
           clientId,
           clientSecret,
@@ -355,23 +428,78 @@ export class GdriveService implements OnApplicationBootstrap {
           teamDriveId: sharedDriveId || undefined,
         });
       } else {
-        const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE');
+        const serviceAccountFile = this.configService.get<string>(
+          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        );
         if (!serviceAccountFile) {
-          throw new Error('Google Service Account key file is not configured on the platform');
+          throw new Error(
+            'Google Service Account key file is not configured on the platform',
+          );
         }
-        remoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
+        tempRemoteName = await this.rcloneConfig.createGdriveRemote(tempJobId, {
           serviceAccountFile,
           teamDriveId: sharedDriveId || undefined,
         });
       }
 
-      return await this.rcloneService.calculateWavDurationOfPath(`${remoteName}:`, path || '', onProgress);
+      // 2. Resolve target folder ID if path is specified
+      let rootFolderId: string | null = null;
+      const cleanPath = path ? path.replace(/^\/|\/$/g, '') : '';
+      if (cleanPath) {
+        rootFolderId = await this.rcloneService.getPathId(
+          `${tempRemoteName}:`,
+          cleanPath,
+        );
+      }
+
+      // Clean up the temporary remote immediately after resolving path ID
+      await this.rcloneConfig.cleanupRemotes(tempJobId);
+      tempRemoteName = '';
+
+      // 3. Create the final run remote rooted at the target folder ID (or top level if not resolved)
+      if (authType === 'OAUTH') {
+        const { clientId, clientSecret, tokenJson } =
+          this.getOAuthCredsFromEnv();
+        runRemoteName = await this.rcloneConfig.createGdriveRemote(runJobId, {
+          authType: 'OAUTH',
+          clientId,
+          clientSecret,
+          tokenJson,
+          teamDriveId: sharedDriveId || undefined,
+          rootFolderId: rootFolderId || undefined,
+        });
+      } else {
+        const serviceAccountFile = this.configService.get<string>(
+          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        );
+        runRemoteName = await this.rcloneConfig.createGdriveRemote(runJobId, {
+          serviceAccountFile,
+          teamDriveId: sharedDriveId || undefined,
+          rootFolderId: rootFolderId || undefined,
+        });
+      }
+
+      // 4. Run the WAV analysis. If rooted, path should be empty (since remote is already at target folder)
+      const analysisPath = rootFolderId ? '' : cleanPath;
+      this.logger.log(
+        `Executing calculateWavDurationOfPath on ${runRemoteName}: with path: "${analysisPath}" (rootFolderId: ${rootFolderId})`,
+      );
+      return await this.rcloneService.calculateWavDurationOfPath(
+        `${runRemoteName}:`,
+        analysisPath,
+        onProgress,
+      );
     } catch (error: any) {
-      this.logger.error(`Error calculating Google Drive WAV duration: ${error.message}`);
+      this.logger.error(
+        `Error calculating Google Drive WAV duration: ${error.message}`,
+      );
       throw new Error(`Failed to calculate WAV duration: ${error.message}`);
     } finally {
-      if (remoteName) {
+      if (tempRemoteName) {
         await this.rcloneConfig.cleanupRemotes(tempJobId);
+      }
+      if (runRemoteName) {
+        await this.rcloneConfig.cleanupRemotes(runJobId);
       }
     }
   }

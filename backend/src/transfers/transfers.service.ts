@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, OnApplicationBootstrap } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnApplicationBootstrap,
+} from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
@@ -17,11 +22,19 @@ export class TransfersService implements OnApplicationBootstrap {
   ) {}
 
   private async addToQueueSafe(transferId: string) {
-    const activeJobs = await this.transferQueue.getJobs(['waiting', 'active', 'delayed']);
-    const isAlreadyQueued = activeJobs.some((job) => job.data?.transferId === transferId);
+    const activeJobs = await this.transferQueue.getJobs([
+      'waiting',
+      'active',
+      'delayed',
+    ]);
+    const isAlreadyQueued = activeJobs.some(
+      (job) => job.data?.transferId === transferId,
+    );
 
     if (isAlreadyQueued) {
-      this.logger.log(`Transfer ${transferId} is already in wait/active queue. Skipping duplicate enqueue.`);
+      this.logger.log(
+        `Transfer ${transferId} is already in wait/active queue. Skipping duplicate enqueue.`,
+      );
       return;
     }
 
@@ -38,10 +51,14 @@ export class TransfersService implements OnApplicationBootstrap {
       });
 
       for (const transfer of runningTransfers) {
-        const activeJobId = await this.rcloneService.getActiveJobId(transfer.id);
+        const activeJobId = await this.rcloneService.getActiveJobId(
+          transfer.id,
+        );
 
         if (activeJobId) {
-          this.logger.log(`Found active background rclone job ${activeJobId} for RUNNING transfer ${transfer.id}. Re-queueing monitoring job...`);
+          this.logger.log(
+            `Found active background rclone job ${activeJobId} for RUNNING transfer ${transfer.id}. Re-queueing monitoring job...`,
+          );
           await this.prisma.transferLog.create({
             data: {
               transferId: transfer.id,
@@ -52,7 +69,9 @@ export class TransfersService implements OnApplicationBootstrap {
           // Re-add to BullMQ queue so the worker resumes monitoring it
           await this.addToQueueSafe(transfer.id);
         } else {
-          this.logger.log(`Transfer ${transfer.id} is marked RUNNING but no active background rclone job was found. Resetting to QUEUED...`);
+          this.logger.log(
+            `Transfer ${transfer.id} is marked RUNNING but no active background rclone job was found. Resetting to QUEUED...`,
+          );
           await this.prisma.transfer.update({
             where: { id: transfer.id },
             data: { status: 'QUEUED' },
@@ -61,7 +80,8 @@ export class TransfersService implements OnApplicationBootstrap {
             data: {
               transferId: transfer.id,
               level: 'WARN',
-              message: 'Transfer execution interrupted and no active background job found. Reset to QUEUED.',
+              message:
+                'Transfer execution interrupted and no active background job found. Reset to QUEUED.',
             },
           });
         }
@@ -70,7 +90,9 @@ export class TransfersService implements OnApplicationBootstrap {
       // 2. Trigger the sequential queue processor
       await this.processNextQueuedTransfer();
     } catch (err: any) {
-      this.logger.error(`Failed to initialize queue session on startup: ${err.message}`);
+      this.logger.error(
+        `Failed to initialize queue session on startup: ${err.message}`,
+      );
     }
   }
 
@@ -203,7 +225,9 @@ export class TransfersService implements OnApplicationBootstrap {
       },
     });
 
-    this.logger.log(`Transfer created: ${transfer.name} (${transfer.id}) with launchMode: ${launchMode}`);
+    this.logger.log(
+      `Transfer created: ${transfer.name} (${transfer.id}) with launchMode: ${launchMode}`,
+    );
 
     // If not scheduled, handle launch mode
     if (!dto.scheduledAt) {
@@ -227,7 +251,9 @@ export class TransfersService implements OnApplicationBootstrap {
   async startTransfer(id: string) {
     const transfer = await this.findById(id);
 
-    if (!['QUEUED', 'PAUSED', 'FAILED', 'SCHEDULED'].includes(transfer.status)) {
+    if (
+      !['QUEUED', 'PAUSED', 'FAILED', 'SCHEDULED'].includes(transfer.status)
+    ) {
       throw new Error(`Cannot start transfer in status: ${transfer.status}`);
     }
 
@@ -245,7 +271,9 @@ export class TransfersService implements OnApplicationBootstrap {
   async queueTransfer(id: string) {
     const transfer = await this.findById(id);
 
-    if (!['QUEUED', 'PAUSED', 'FAILED', 'SCHEDULED'].includes(transfer.status)) {
+    if (
+      !['QUEUED', 'PAUSED', 'FAILED', 'SCHEDULED'].includes(transfer.status)
+    ) {
       throw new Error(`Cannot queue transfer in status: ${transfer.status}`);
     }
 
@@ -269,7 +297,9 @@ export class TransfersService implements OnApplicationBootstrap {
       });
 
       if (running) {
-        this.logger.log(`A transfer is already running: ${running.id}. Next queued transfer will wait.`);
+        this.logger.log(
+          `A transfer is already running: ${running.id}. Next queued transfer will wait.`,
+        );
         return;
       }
 
@@ -368,7 +398,9 @@ export class TransfersService implements OnApplicationBootstrap {
           await this.rcloneService.stopJob(transfer.rcloneJobId);
         }
       } catch (err: any) {
-        this.logger.warn(`Failed to stop job ${transfer.rcloneJobId} during deletion: ${err.message}`);
+        this.logger.warn(
+          `Failed to stop job ${transfer.rcloneJobId} during deletion: ${err.message}`,
+        );
       }
     }
 

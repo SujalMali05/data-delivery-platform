@@ -307,3 +307,26 @@ enum ValidationStatus {
   COMPLETED
   FAILED
 }
+
+// ── Audio Duration Analyzer History ──────────────────────────────────────────
+
+model WavCalculation {
+  id              String   @id @default(uuid())
+  name            String
+  storageType     String   @map("storage_type") // "S3" or "GDrive"
+  targetPath      String   @map("target_path")
+  sourceName      String   @map("source_name")  // Customer name or GDrive source name
+  status          String   @default("PENDING")
+  progressScanned Int      @default(0) @map("progress_scanned")
+  progressTotal   Int      @default(0) @map("progress_total")
+  currentFile     String   @default("") @map("current_file")
+  errorMessage    String?  @map("error_message")
+  totalDuration   Float    @default(0) @map("total_duration")
+  wavCount        Int      @default(0) @map("wav_count")
+  skippedCount    Int      @default(0) @map("skipped_count")
+  files           Json     @default("[]")      // List of WavFileDetails: Array<{ name: string, path: string, size: number, duration: number }>
+  parameters      Json?                         // Parameters used to run: { roleArn, bucketName, region, externalId, sharedDriveId, authType }
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@map("wav_calculations")
+}

@@ -39,7 +39,9 @@ export class NotificationsService {
    * Send notification to all configured channels
    */
   async notify(payload: NotificationPayload) {
-    this.logger.log(`Sending notification: ${payload.event} - ${payload.title}`);
+    this.logger.log(
+      `Sending notification: ${payload.event} - ${payload.title}`,
+    );
 
     const promises: Promise<void>[] = [];
 
@@ -113,16 +115,13 @@ export class NotificationsService {
             ? '❌'
             : '⚠️';
 
-      await axios.post(
-        `https://api.telegram.org/bot${botToken}/sendMessage`,
-        {
-          chat_id: chatId,
-          text: `${emoji} *${payload.title}*\n\n${payload.message}${
-            payload.transferName ? `\n\n📦 Transfer: ${payload.transferName}` : ''
-          }`,
-          parse_mode: 'Markdown',
-        },
-      );
+      await axios.post(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+        chat_id: chatId,
+        text: `${emoji} *${payload.title}*\n\n${payload.message}${
+          payload.transferName ? `\n\n📦 Transfer: ${payload.transferName}` : ''
+        }`,
+        parse_mode: 'Markdown',
+      });
       this.logger.log('Telegram notification sent');
     } catch (error: any) {
       this.logger.error(`Telegram notification failed: ${error.message}`);

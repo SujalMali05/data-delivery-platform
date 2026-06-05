@@ -155,7 +155,12 @@ export class CustomersService {
         message: `Validation failed: ${error.message}`,
         checks: {
           assumeRole: error.step === 'assumeRole' ? 'FAILED' : 'PASSED',
-          listObjects: error.step === 'listObjects' ? 'FAILED' : error.step ? 'SKIPPED' : 'PASSED',
+          listObjects:
+            error.step === 'listObjects'
+              ? 'FAILED'
+              : error.step
+                ? 'SKIPPED'
+                : 'PASSED',
           uploadObject: error.step === 'uploadObject' ? 'FAILED' : 'SKIPPED',
         },
       };
@@ -190,7 +195,10 @@ export class CustomersService {
 
       // Format rclone list path: remoteName:bucket/path
       const rclonePath = `${bucketName}/${path || ''}`.replace(/\/$/, '');
-      const response = await this.rcloneService.listDirectory(`${remoteName}:`, rclonePath);
+      const response = await this.rcloneService.listDirectory(
+        `${remoteName}:`,
+        rclonePath,
+      );
 
       const list = response.list || [];
       return list
@@ -239,7 +247,10 @@ export class CustomersService {
         region,
       );
 
-      const rcloneFs = `${remoteName}:${bucketName}/${path || ''}`.replace(/\/$/, '');
+      const rcloneFs = `${remoteName}:${bucketName}/${path || ''}`.replace(
+        /\/$/,
+        '',
+      );
       return await this.rcloneService.calculateSize(rcloneFs, '');
     } catch (error: any) {
       this.logger.error(`Error calculating S3 size: ${error.message}`);
@@ -283,9 +294,11 @@ export class CustomersService {
       );
 
       // Format rclone list path with prefixPath support: remoteName:bucket/prefix/path
-      const basePrefix = customer.prefixPath ? customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+      const basePrefix = customer.prefixPath
+        ? customer.prefixPath.trim().replace(/^\/|\/$/g, '')
+        : '';
       const searchPath = path ? path.trim().replace(/^\/|\/$/g, '') : '';
-      
+
       let rclonePath = customer.bucketName;
       if (basePrefix) {
         rclonePath += `/${basePrefix}`;
@@ -294,10 +307,13 @@ export class CustomersService {
         rclonePath += `/${searchPath}`;
       }
 
-      const response = await this.rcloneService.listDirectory(`${remoteName}:`, rclonePath);
+      const response = await this.rcloneService.listDirectory(
+        `${remoteName}:`,
+        rclonePath,
+      );
 
       const list = response.list || [];
-      
+
       let prefixToStrip = customer.bucketName + '/';
       if (basePrefix) {
         prefixToStrip += basePrefix + '/';
@@ -356,7 +372,11 @@ export class CustomersService {
     region: string,
     externalId: string | null,
     path: string = '',
-    onProgress?: (progress: { scanned: number; total: number; currentFile: string }) => void,
+    onProgress?: (progress: {
+      scanned: number;
+      total: number;
+      currentFile: string;
+    }) => void,
   ) {
     const tempJobId = `wav-duration-${Date.now()}`;
     let remoteName = '';
@@ -375,7 +395,11 @@ export class CustomersService {
       );
 
       const rclonePath = `${bucketName}/${path || ''}`.replace(/\/$/, '');
-      return await this.rcloneService.calculateWavDurationOfPath(`${remoteName}:`, rclonePath, onProgress);
+      return await this.rcloneService.calculateWavDurationOfPath(
+        `${remoteName}:`,
+        rclonePath,
+        onProgress,
+      );
     } catch (error: any) {
       this.logger.error(`Error calculating S3 WAV duration: ${error.message}`);
       throw new Error(`Failed to calculate S3 WAV duration: ${error.message}`);

@@ -65,20 +65,34 @@ export class ValidationProcessor extends WorkerHost {
         validation.customer.roleArn,
         validation.customer.externalId || undefined,
       );
-      this.logger.log(`STS assumeRole successful for customer validation: ${validation.customer.name}`);
+      this.logger.log(
+        `STS assumeRole successful for customer validation: ${validation.customer.name}`,
+      );
 
       // 3. Create Dynamic Rclone Remotes
       const remoteNamespace = `val-${validationId}`;
       const sourceAuthType = validation.source.authType || 'SERVICE_ACCOUNT';
 
-      gdriveRemote = await this.rcloneConfig.createGdriveRemote(remoteNamespace, {
-        serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
-        teamDriveId: validation.source.sharedDriveId || undefined,
-        authType: sourceAuthType,
-        clientId: validation.source.clientId || process.env.GOOGLE_OAUTH_CLIENT_ID || undefined,
-        clientSecret: validation.source.clientSecret || process.env.GOOGLE_OAUTH_CLIENT_SECRET || undefined,
-        tokenJson: validation.source.tokenJson || process.env.GOOGLE_OAUTH_TOKEN || undefined,
-      });
+      gdriveRemote = await this.rcloneConfig.createGdriveRemote(
+        remoteNamespace,
+        {
+          serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
+          teamDriveId: validation.source.sharedDriveId || undefined,
+          authType: sourceAuthType,
+          clientId:
+            validation.source.clientId ||
+            process.env.GOOGLE_OAUTH_CLIENT_ID ||
+            undefined,
+          clientSecret:
+            validation.source.clientSecret ||
+            process.env.GOOGLE_OAUTH_CLIENT_SECRET ||
+            undefined,
+          tokenJson:
+            validation.source.tokenJson ||
+            process.env.GOOGLE_OAUTH_TOKEN ||
+            undefined,
+        },
+      );
 
       s3Remote = await this.rcloneConfig.createS3Remote(
         remoteNamespace,
@@ -86,13 +100,23 @@ export class ValidationProcessor extends WorkerHost {
         validation.customer.region,
       );
 
-      const drivePath = validation.source.drivePath ? validation.source.drivePath.replace(/^\/|\/$/g, '') : '';
-      const sourcePath = validation.sourcePath ? validation.sourcePath.replace(/^\/|\/$/g, '') : '';
-      const cleanSrcPath = drivePath ? (sourcePath ? `${drivePath}/${sourcePath}` : drivePath) : sourcePath;
+      const drivePath = validation.source.drivePath
+        ? validation.source.drivePath.replace(/^\/|\/$/g, '')
+        : '';
+      const sourcePath = validation.sourcePath
+        ? validation.sourcePath.replace(/^\/|\/$/g, '')
+        : '';
+      const cleanSrcPath = drivePath
+        ? sourcePath
+          ? `${drivePath}/${sourcePath}`
+          : drivePath
+        : sourcePath;
       const srcFs = `${gdriveRemote}:${cleanSrcPath}`;
 
       let dstPath = validation.destinationPath || '';
-      const prefixPath = validation.customer.prefixPath ? validation.customer.prefixPath.trim().replace(/^\/|\/$/g, '') : '';
+      const prefixPath = validation.customer.prefixPath
+        ? validation.customer.prefixPath.trim().replace(/^\/|\/$/g, '')
+        : '';
       const cleanDstPath = dstPath.trim().replace(/^\/|\/$/g, '');
 
       let s3Path = cleanDstPath;
@@ -108,18 +132,24 @@ export class ValidationProcessor extends WorkerHost {
         }
       }
       dstPath = s3Path;
-      const dstFs = `${s3Remote}:${validation.customer.bucketName}/${dstPath}`.replace(/\/\/+/g, '/').replace(/\/+$/, '');
+      const dstFs = `${s3Remote}:${validation.customer.bucketName}/${dstPath}`
+        .replace(/\/\/+/g, '/')
+        .replace(/\/+$/, '');
 
-      this.logger.log(`Validation sources: Source [${srcFs}] | Destination [${dstFs}]`);
+      this.logger.log(
+        `Validation sources: Source [${srcFs}] | Destination [${dstFs}]`,
+      );
 
       // 3.5 Scan Google Drive source (srcFs) recursively to detect duplicates
-      let duplicates: any[] = [];
+      const duplicates: any[] = [];
       let duplicatesCount = 0;
       try {
         this.logger.log(`Scanning Google Drive for duplicates: ${srcFs}`);
-        const listRes = await this.rcloneService.listDirectory(srcFs, '', { recurse: true });
+        const listRes = await this.rcloneService.listDirectory(srcFs, '', {
+          recurse: true,
+        });
         const files = (listRes.list || []).filter((item: any) => !item.IsDir);
-        
+
         const filesByPath: Record<string, any[]> = {};
         for (const file of files) {
           const path = file.Path;
@@ -131,7 +161,7 @@ export class ValidationProcessor extends WorkerHost {
 
         for (const [path, items] of Object.entries(filesByPath)) {
           if (items.length > 1) {
-            duplicatesCount += (items.length - 1);
+            duplicatesCount += items.length - 1;
             duplicates.push({
               path,
               count: items.length,
@@ -143,9 +173,13 @@ export class ValidationProcessor extends WorkerHost {
             });
           }
         }
-        this.logger.log(`Scan completed. Found ${duplicatesCount} duplicate file copies.`);
+        this.logger.log(
+          `Scan completed. Found ${duplicatesCount} duplicate file copies.`,
+        );
       } catch (err: any) {
-        this.logger.warn(`Failed to scan Google Drive for duplicates: ${err.message}`);
+        this.logger.warn(
+          `Failed to scan Google Drive for duplicates: ${err.message}`,
+        );
       }
 
       // 4. Sizing Calculations
@@ -159,7 +193,9 @@ export class ValidationProcessor extends WorkerHost {
         srcBytes = BigInt(srcSize.bytes);
         srcFiles = srcSize.count;
       } catch (err: any) {
-        this.logger.warn(`Failed to pre-calculate source folder size: ${err.message}`);
+        this.logger.warn(
+          `Failed to pre-calculate source folder size: ${err.message}`,
+        );
       }
 
       try {
@@ -167,7 +203,9 @@ export class ValidationProcessor extends WorkerHost {
         dstBytes = BigInt(dstSize.bytes);
         dstFiles = dstSize.count;
       } catch (err: any) {
-        this.logger.warn(`Failed to pre-calculate destination folder size: ${err.message}`);
+        this.logger.warn(
+          `Failed to pre-calculate destination folder size: ${err.message}`,
+        );
       }
 
       await this.prisma.validation.update({
@@ -204,7 +242,9 @@ export class ValidationProcessor extends WorkerHost {
           if (jobStatus.success) {
             checkOutput = jobStatus.output || {};
           } else {
-            throw new Error(`rclone check job failed: ${jobStatus.error || 'Unknown error'}`);
+            throw new Error(
+              `rclone check job failed: ${jobStatus.error || 'Unknown error'}`,
+            );
           }
         }
       }
@@ -276,22 +316,28 @@ export class ValidationProcessor extends WorkerHost {
         },
       });
 
-      this.logger.log(`✅ Folder validation completed successfully: ${validationId}`);
-
+      this.logger.log(
+        `✅ Folder validation completed successfully: ${validationId}`,
+      );
     } catch (err: any) {
-      this.logger.error(`❌ Validation failed for ${validationId}: ${err.message}`);
+      this.logger.error(
+        `❌ Validation failed for ${validationId}: ${err.message}`,
+      );
 
       try {
         await this.prisma.validation.update({
           where: { id: validationId },
           data: {
             status: 'FAILED',
-            errorMessage: err.message || 'Validation process failed due to internal error',
+            errorMessage:
+              err.message || 'Validation process failed due to internal error',
             completedAt: new Date(),
           },
         });
       } catch (dbUpdateErr: any) {
-        this.logger.error(`Failed to record validation failure in DB: ${dbUpdateErr.message}`);
+        this.logger.error(
+          `Failed to record validation failure in DB: ${dbUpdateErr.message}`,
+        );
       }
     } finally {
       // 9. Cleanup dynamic remotes
@@ -300,7 +346,9 @@ export class ValidationProcessor extends WorkerHost {
         try {
           await this.rcloneConfig.cleanupRemotes(remoteNamespace);
         } catch (cleanupErr: any) {
-          this.logger.warn(`Failed to cleanup validation remotes for ${remoteNamespace}: ${cleanupErr.message}`);
+          this.logger.warn(
+            `Failed to cleanup validation remotes for ${remoteNamespace}: ${cleanupErr.message}`,
+          );
         }
       }
     }
