@@ -1,5 +1,4 @@
 'use client';
-
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { gdriveApi, customersApi } from '../lib/api-client';
@@ -10,12 +9,13 @@ import {
   ArrowLeft,
   ChevronRight,
   FolderOpen,
+  File,
 } from 'lucide-react';
 
 interface FolderBrowserProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (path: string) => void;
+  onSelect?: (path: string) => void;
   type: 'gdrive' | 's3';
   s3Params?: {
     roleArn: string;
@@ -26,12 +26,16 @@ interface FolderBrowserProps {
   gdriveAuthType?: string;
   sharedDriveId?: string;
   initialPath?: string;
+  showFiles?: boolean;
+  multiSelect?: boolean;
+  onSelectMultiple?: (items: Array<{ name: string; path: string; isDir: boolean }>) => void;
 }
 
 interface DirectoryItem {
   name: string;
   path: string;
   id?: string | null;
+  isDir?: boolean;
 }
 
 export default function FolderBrowser({
@@ -43,12 +47,16 @@ export default function FolderBrowser({
   gdriveAuthType,
   sharedDriveId,
   initialPath = '',
+  showFiles = false,
+  multiSelect = false,
+  onSelectMultiple,
 }: FolderBrowserProps) {
   const [currentPath, setCurrentPath] = useState(initialPath);
   const [items, setItems] = useState<DirectoryItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const [checkedItems, setCheckedItems] = useState<Record<string, { name: string; path: string; isDir: boolean }>>({});
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -59,6 +67,7 @@ export default function FolderBrowser({
     if (isOpen) {
       setCurrentPath(initialPath);
       setSelectedPath(initialPath || '/');
+      setCheckedItems({});
       loadDirectory(initialPath);
     }
   }, [isOpen, initialPath]);
@@ -84,6 +93,7 @@ export default function FolderBrowser({
           path,
           sharedDriveId,
           authType: gdriveAuthType,
+          showFiles,
         });
         folders = response.data;
       } else if (type === 's3') {
@@ -96,11 +106,18 @@ export default function FolderBrowser({
           region: s3Params.region,
           externalId: s3Params.externalId,
           path,
+          showFiles,
         });
         folders = response.data;
       }
-      // Sort folders alphabetically
-      folders.sort((a, b) => a.name.localeCompare(b.name));
+      // Sort folders first, then files, both alphabetically
+      folders.sort((a, b) => {
+        const aIsDir = !!a.isDir;
+        const bIsDir = !!b.isDir;
+        if (aIsDir && !bIsDir) return -1;
+        if (!aIsDir && bIsDir) return 1;
+        return a.name.localeCompare(b.name);
+      });
       setItems(folders);
     } catch (err: any) {
       setError(err.response?.data?.message || err.message || 'Failed to list directory contents.');
@@ -110,15 +127,34 @@ export default function FolderBrowser({
     }
   };
 
-  const handleFolderDoubleClick = (folderPath: string) => {
-    const cleanPath = folderPath.replace(/\/$/, '');
-    setCurrentPath(cleanPath);
-    setSelectedPath(cleanPath);
-    loadDirectory(cleanPath);
+  const handleItemDoubleClick = (item: DirectoryItem) => {
+    if (item.isDir) {
+      const cleanPath = item.path.replace(/\/$/, '');
+      setCurrentPath(cleanPath);
+      setSelectedPath(cleanPath);
+      loadDirectory(cleanPath);
+    }
   };
 
-  const handleFolderClick = (folderPath: string) => {
-    setSelectedPath(folderPath.replace(/\/$/, ''));
+  const handleItemClick = (item: DirectoryItem) => {
+    setSelectedPath(item.path.replace(/\/$/, ''));
+  };
+
+  const handleToggleCheck = (item: DirectoryItem) => {
+    const key = item.path;
+    setCheckedItems((prev) => {
+      const next = { ...prev };
+      if (next[key]) {
+        delete next[key];
+      } else {
+        next[key] = {
+          name: item.name,
+          path: item.path,
+          isDir: !!item.isDir,
+        };
+      }
+      return next;
+    });
   };
 
   const navigateUp = () => {
@@ -141,7 +177,10 @@ export default function FolderBrowser({
   };
 
   const handleSelect = () => {
-    if (selectedPath !== null) {
+    if (multiSelect && onSelectMultiple) {
+      onSelectMultiple(Object.values(checkedItems));
+      onClose();
+    } else if (selectedPath !== null && onSelect) {
       onSelect(selectedPath === '/' ? '' : selectedPath);
       onClose();
     }
@@ -307,17 +346,22 @@ export default function FolderBrowser({
           ) : items.length === 0 ? (
             <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
               <Folder size={32} color="var(--text-muted)" />
-              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>No subdirectories found here.</span>
+              <span style={{ fontSize: '13px', color: 'var(--text-secondary)' }}>
+                {showFiles ? 'No files or subdirectories found.' : 'No subdirectories found here.'}
+              </span>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {items.map((item, idx) => {
                 const isSelected = selectedPath === item.path;
+                const isChecked = !!checkedItems[item.path];
+                const itemIsDir = !!item.isDir;
+
                 return (
                   <div
                     key={`${item.id || ''}_${item.path}_${idx}`}
-                    onClick={() => handleFolderClick(item.path)}
-                    onDoubleClick={() => handleFolderDoubleClick(item.path)}
+                    onClick={() => handleItemClick(item)}
+                    onDoubleClick={() => handleItemDoubleClick(item)}
                     style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -331,13 +375,38 @@ export default function FolderBrowser({
                     }}
                     className={!isSelected ? 'glass-hover' : ''}
                   >
-                    <Folder size={16} color={isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)'} />
+                    {multiSelect && (
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={(e) => {
+                          e.stopPropagation();
+                          handleToggleCheck(item);
+                        }}
+                        style={{
+                          width: '16px',
+                          height: '16px',
+                          accentColor: 'var(--accent-blue)',
+                          cursor: 'pointer',
+                          marginRight: '2px',
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                    {itemIsDir ? (
+                      <Folder size={16} color={isSelected ? 'var(--accent-blue)' : 'var(--text-secondary)'} style={{ flexShrink: 0 }} />
+                    ) : (
+                      <File size={16} color="var(--text-tertiary)" style={{ flexShrink: 0 }} />
+                    )}
                     <span
                       style={{
                         fontSize: '14px',
                         color: isSelected ? 'var(--text-primary)' : 'var(--text-secondary)',
                         userSelect: 'none',
                         fontWeight: isSelected ? 500 : 400,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
                       }}
                     >
                       {item.name}
@@ -360,7 +429,11 @@ export default function FolderBrowser({
           }}
         >
           <div style={{ fontSize: '12px', color: 'var(--text-muted)', maxWidth: '480px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            Selected: <span style={{ color: 'var(--text-secondary)' }}>{selectedPath || '/'}</span>
+            {multiSelect ? (
+              <span>Selected: <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>{Object.keys(checkedItems).length} items selected</span></span>
+            ) : (
+              <span>Selected: <span style={{ color: 'var(--text-secondary)' }}>{selectedPath || '/'}</span></span>
+            )}
           </div>
           <div style={{ display: 'flex', gap: '12px' }}>
             <button className="btn-secondary" onClick={onClose} style={{ padding: '8px 16px', fontSize: '13px' }}>
@@ -369,10 +442,14 @@ export default function FolderBrowser({
             <button
               className="btn-primary"
               onClick={handleSelect}
-              disabled={loading || !!error}
-              style={{ padding: '8px 16px', fontSize: '13px', opacity: (loading || !!error) ? 0.5 : 1 }}
+              disabled={loading || !!error || (multiSelect && Object.keys(checkedItems).length === 0)}
+              style={{
+                padding: '8px 16px',
+                fontSize: '13px',
+                opacity: (loading || !!error || (multiSelect && Object.keys(checkedItems).length === 0)) ? 0.5 : 1,
+              }}
             >
-              Select Folder
+              {multiSelect ? 'Select Items' : 'Select Folder'}
             </button>
           </div>
         </div>

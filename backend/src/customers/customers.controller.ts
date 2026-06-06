@@ -57,6 +57,7 @@ export class CustomersController {
       region: string;
       externalId?: string;
       path?: string;
+      showFiles?: boolean;
     },
   ) {
     return this.customersService.browseBucket(
@@ -65,6 +66,7 @@ export class CustomersController {
       body.region,
       body.externalId || null,
       body.path,
+      body.showFiles,
     );
   }
 

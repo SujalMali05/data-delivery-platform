@@ -3,6 +3,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { RcloneService } from '../rclone/rclone.service';
 import { RcloneConfigService } from '../rclone/rclone-config.service';
 import { StsService } from '../aws/sts.service';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface DryRunReport {
   source: {
@@ -53,10 +55,12 @@ export class DryRunService {
     checkers?: number;
     mode?: 'COPY' | 'SYNC' | 'MOVE';
     skipDeletion?: boolean;
+    selectedItems?: string[];
   }): Promise<DryRunReport> {
     const dryRunId = `dryrun-${Date.now()}`;
     let gdriveRemote: string | null = null;
     let s3Remote: string | null = null;
+    let filterFilePath: string | null = null;
 
     try {
       // 1. Load source and customer
@@ -142,6 +146,18 @@ export class DryRunService {
         effectiveMode = 'copy';
       }
 
+      // 4.5. Generate filter file if selectedItems is provided
+      if (params.selectedItems && params.selectedItems.length > 0) {
+        const filterFileName = `filter-${dryRunId}.txt`;
+        filterFilePath = path.join(process.cwd(), filterFileName);
+        const filterLines = params.selectedItems.map((item) => {
+          const clean = item.replace(/^\//, '');
+          return `+ /${clean}`;
+        });
+        filterLines.push('- **');
+        fs.writeFileSync(filterFilePath, filterLines.join('\n'), 'utf-8');
+      }
+
       // 5. Run size calculations and dry-run sync in parallel
       this.logger.log(
         `Dry-run: Initiating source size, destination size, and dry-run sync in parallel...`,
@@ -155,7 +171,10 @@ export class DryRunService {
             dstFs,
             dryRunId,
             effectiveMode,
-            { checkers: params.checkers || 32 },
+            {
+              checkers: params.checkers || 32,
+              filterFrom: filterFilePath || undefined,
+            },
           ),
         ],
       );
@@ -338,6 +357,9 @@ export class DryRunService {
     } finally {
       // Cleanup
       try {
+        if (filterFilePath && fs.existsSync(filterFilePath)) {
+          fs.unlinkSync(filterFilePath);
+        }
         await this.rcloneConfig.cleanupRemotes(dryRunId);
         this.logger.log(`Dry-run remotes cleaned up: ${dryRunId}`);
       } catch (cleanupErr: any) {

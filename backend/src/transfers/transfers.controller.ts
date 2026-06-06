@@ -59,6 +59,7 @@ export class TransfersController {
       checkers: dto.checkers,
       mode: dto.mode,
       skipDeletion: dto.skipDeletion,
+      selectedItems: dto.selectedItems,
     });
   }
 

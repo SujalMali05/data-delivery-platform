@@ -213,6 +213,7 @@ export class TransfersService implements OnApplicationBootstrap {
         bandwidthLimit: dto.bandwidthLimit,
         skipDeletion: dto.skipDeletion || false,
         dryRunReport: dto.dryRunReport || null,
+        selectedItems: dto.selectedItems || undefined,
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : null,
         scheduleType: dto.scheduleType,
         cronExpression: dto.cronExpression,

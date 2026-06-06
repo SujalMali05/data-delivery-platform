@@ -79,4 +79,7 @@ export class CreateTransferDto {
 
   @IsOptional()
   dryRunReport?: any;
+
+  @IsOptional()
+  selectedItems?: string[];
 }

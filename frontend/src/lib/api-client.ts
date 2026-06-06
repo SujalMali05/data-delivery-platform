@@ -58,7 +58,7 @@ export const customersApi = {
   update: (id: string, data: any) => apiClient.put(`/customers/${id}`, data),
   delete: (id: string) => apiClient.delete(`/customers/${id}`),
   validate: (id: string) => apiClient.post(`/customers/${id}/validate`),
-  browse: (data: { roleArn: string; bucketName: string; region: string; externalId?: string; path?: string }) =>
+  browse: (data: { roleArn: string; bucketName: string; region: string; externalId?: string; path?: string; showFiles?: boolean }) =>
     apiClient.post('/customers/browse', data),
   size: (data: { roleArn: string; bucketName: string; region: string; externalId?: string; path?: string }) =>
     apiClient.post('/customers/size', data),
@@ -78,6 +78,7 @@ export const gdriveApi = {
     path?: string;
     sharedDriveId?: string;
     authType?: string;
+    showFiles?: boolean;
   }) => apiClient.post('/gdrive/browse', data),
   size: (data: {
     path?: string;

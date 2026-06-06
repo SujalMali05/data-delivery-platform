@@ -13,6 +13,8 @@ import {
   SNAPSHOT_INTERVAL_MS,
   CREDENTIAL_REFRESH_INTERVAL_MS,
 } from './constants';
+import * as fs from 'fs';
+import * as path from 'path';
 
 export interface TransferJobData {
   transferId: string;
@@ -43,6 +45,7 @@ export class TransferProcessor extends WorkerHost {
 
     let gdriveRemote: string | null = null;
     let s3Remote: string | null = null;
+    let filterFilePath: string | null = null;
     let isPull = false;
     let dstFs = '';
 
@@ -254,6 +257,19 @@ export class TransferProcessor extends WorkerHost {
               | 'sync'
               | 'move';
 
+            // Generate filter file if selectedItems is provided
+            if (transfer.selectedItems && Array.isArray(transfer.selectedItems) && transfer.selectedItems.length > 0) {
+              const filterFileName = `filter-${transferId}.txt`;
+              filterFilePath = path.join(process.cwd(), filterFileName);
+              const filterLines = (transfer.selectedItems as string[]).map((item) => {
+                const clean = item.replace(/^\//, '');
+                return `+ /${clean}`;
+              });
+              filterLines.push('- **');
+              fs.writeFileSync(filterFilePath, filterLines.join('\n'), 'utf-8');
+              this.logger.log(`Generated selective transfer filter file: ${filterFilePath}`);
+            }
+
             const result = await this.rcloneService.startTransfer(
               srcFs,
               dstFs,
@@ -265,6 +281,7 @@ export class TransferProcessor extends WorkerHost {
                 retries: transfer.retries,
                 bandwidthLimit: transfer.bandwidthLimit || undefined,
                 skipDeletion: transfer.skipDeletion || false,
+                filterFrom: filterFilePath || undefined,
               },
             );
 
@@ -406,6 +423,14 @@ export class TransferProcessor extends WorkerHost {
       }
     } finally {
       // ── Cleanup ───────────────────────────────────────────
+      if (filterFilePath && fs.existsSync(filterFilePath)) {
+        try {
+          fs.unlinkSync(filterFilePath);
+          this.logger.log(`Temporary filter file cleaned up: ${filterFilePath}`);
+        } catch (err: any) {
+          this.logger.warn(`Failed to delete filter file ${filterFilePath}: ${err.message}`);
+        }
+      }
       if (gdriveRemote || s3Remote) {
         await this.rcloneConfig.cleanupRemotes(transferId);
         await this.logTransfer(

@@ -24,6 +24,8 @@ import {
   FolderOpen,
   HardDrive,
   Database,
+  File,
+  Folder,
 } from 'lucide-react';
 import Link from 'next/link';
 import FolderBrowser from '@/components/FolderBrowser';
@@ -38,6 +40,8 @@ export default function NewTransferPage() {
   const [sources, setSources] = useState<any[]>([]);
   const [error, setError] = useState('');
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
+  const [isSourceBrowserOpen, setIsSourceBrowserOpen] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Array<{ name: string; path: string; isDir: boolean }>>([]);
   const [clickedMode, setClickedMode] = useState<'CREATE' | 'START' | 'QUEUE'>('START');
 
   // Dry-run state
@@ -98,6 +102,9 @@ export default function NewTransferPage() {
     setLoading(true);
 
     try {
+      const formattedSelectedItems = selectedItems.map((item) =>
+        item.isDir ? `${item.path}/**` : item.path
+      );
       const response = await transfersApi.create({
         ...form,
         concurrency: form.concurrency === '' ? 6 : form.concurrency,
@@ -106,6 +113,7 @@ export default function NewTransferPage() {
         bandwidthLimit: form.bandwidthLimit || undefined,
         skipDeletion: form.mode === 'SYNC' ? skipDeletion : false,
         dryRunReport: form.mode === 'SYNC' ? dryRunReport : undefined,
+        selectedItems: formattedSelectedItems.length > 0 ? formattedSelectedItems : undefined,
       });
       router.push(`/dashboard/transfers/${response.data.id}`);
     } catch (err: any) {
@@ -120,10 +128,14 @@ export default function NewTransferPage() {
     setDryRunReport(null);
 
     try {
+      const formattedSelectedItems = selectedItems.map((item) =>
+        item.isDir ? `${item.path}/**` : item.path
+      );
       const response = await transfersApi.dryRun({
         ...form,
         concurrency: form.concurrency === '' ? 6 : form.concurrency,
         retries: form.retries === '' ? 50 : form.retries,
+        selectedItems: formattedSelectedItems.length > 0 ? formattedSelectedItems : undefined,
       });
       setDryRunReport(response.data);
       setStep(4);
@@ -779,6 +791,107 @@ export default function NewTransferPage() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Source Items Selector */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '12px' }}>
+                      <label style={{ fontSize: '12px', fontWeight: 600, color: 'var(--text-secondary)' }}>
+                        Items to Transfer (Source Scope)
+                      </label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        <div style={{ display: 'flex', gap: '10px' }}>
+                          <button
+                            type="button"
+                            className="btn-secondary"
+                            onClick={() => {
+                              if (form.direction === 'PUSH' && !form.sourceId) {
+                                alert('Select a source Google Drive connection first.');
+                                return;
+                              }
+                              if (form.direction === 'PULL' && !form.customerId) {
+                                alert('Select a source Customer bucket first.');
+                                return;
+                              }
+                              setIsSourceBrowserOpen(true);
+                            }}
+                            style={{
+                              padding: '10px 16px',
+                              borderRadius: '10px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '8px',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              border: selectedItems.length > 0 ? '1px solid var(--accent-blue)' : '1px solid var(--border-secondary)',
+                              color: selectedItems.length > 0 ? 'var(--accent-blue)' : 'inherit',
+                            }}
+                          >
+                            <FolderOpen size={16} />
+                            {selectedItems.length > 0 ? `Change Selected Items (${selectedItems.length})` : 'Select Specific Files/Folders (Optional)'}
+                          </button>
+                          
+                          {selectedItems.length > 0 && (
+                            <button
+                              type="button"
+                              className="btn-secondary"
+                              onClick={() => setSelectedItems([])}
+                              style={{
+                                padding: '10px 16px',
+                                borderRadius: '10px',
+                                color: 'var(--accent-red)',
+                                border: '1px solid rgba(239, 68, 68, 0.2)',
+                              }}
+                            >
+                              <Trash2 size={16} style={{ display: 'inline', marginRight: '4px' }} />
+                              Reset to All Files
+                            </button>
+                          )}
+                        </div>
+
+                        {selectedItems.length > 0 ? (
+                          <div style={{
+                            background: 'rgba(255, 255, 255, 0.02)',
+                            border: '1px solid var(--border-secondary)',
+                            borderRadius: '10px',
+                            padding: '12px 16px',
+                            maxHeight: '180px',
+                            overflowY: 'auto',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '6px',
+                          }}>
+                            {selectedItems.map((item, idx) => (
+                              <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '13px' }}>
+                                <span style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-secondary)' }}>
+                                  {item.isDir ? <Folder size={14} color="var(--accent-blue)" /> : <File size={14} color="var(--text-tertiary)" />}
+                                  <span style={{ fontFamily: 'monospace' }}>
+                                    {item.path} {item.isDir ? '(Recursive)' : ''}
+                                  </span>
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedItems((prev) => prev.filter((_, i) => i !== idx))}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: 'var(--text-muted)',
+                                    cursor: 'pointer',
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                  }}
+                                  className="btn-secondary-hover"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p style={{ fontSize: '12px', color: 'var(--text-tertiary)', margin: '0' }}>
+                            Currently copying all files and folders under the source root directory.
+                          </p>
+                        )}
+                      </div>
+                    </div>
                   </div>
 
                   {/* Part 2: Concurrency & Bandwidth Tuning (separated by border, inside same card) */}
@@ -1233,6 +1346,35 @@ export default function NewTransferPage() {
             : undefined
         }
         initialPath={form.destinationPath}
+      />
+
+      {/* Source Browser Modal for Push/Pull Selective transfers */}
+      <FolderBrowser
+        isOpen={isSourceBrowserOpen}
+        onClose={() => setIsSourceBrowserOpen(false)}
+        type={form.direction === 'PULL' ? 's3' : 'gdrive'}
+        showFiles={true}
+        multiSelect={true}
+        onSelectMultiple={(items) => setSelectedItems(items)}
+        initialPath=""
+        s3Params={
+          form.direction === 'PULL' && selectedCustomer
+            ? {
+                roleArn: selectedCustomer.roleArn,
+                bucketName: selectedCustomer.bucketName,
+                region: selectedCustomer.region,
+                externalId: selectedCustomer.externalId || undefined,
+              }
+            : undefined
+        }
+        gdriveAuthType={
+          form.direction === 'PUSH' && sources.find((s: any) => s.id === form.sourceId)?.authType || undefined
+        }
+        sharedDriveId={
+          form.direction === 'PUSH' && form.sourceId
+            ? sources.find((s: any) => s.id === form.sourceId)?.sharedDriveId || undefined
+            : undefined
+        }
       />
     </div>
   );

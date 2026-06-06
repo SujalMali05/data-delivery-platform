@@ -29,6 +29,8 @@ import {
   Database,
   Shield,
   Info,
+  Folder,
+  FolderOpen,
 } from 'lucide-react';
 
 export default function TransferDetailPage() {
@@ -314,6 +316,41 @@ export default function TransferDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Selective Transfer Scope ────── */}
+      {transfer.selectedItems && Array.isArray(transfer.selectedItems) && transfer.selectedItems.length > 0 && (
+        <div className="card" style={{ marginBottom: '20px' }}>
+          <h3 style={{ fontSize: '14px', fontWeight: 600, marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <FolderOpen size={16} color="var(--accent-blue)" />
+            Selective Transfer Scope ({transfer.selectedItems.length} items)
+          </h3>
+          <p style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '12px' }}>
+            Only the following specific folders and files are targeted for copy/sync in this pipeline:
+          </p>
+          <div style={{
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--border-secondary)',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            maxHeight: '180px',
+            overflowY: 'auto',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '6px',
+          }}>
+            {transfer.selectedItems.map((item: string, idx: number) => {
+              const isFolder = item.endsWith('/**');
+              const displayPath = isFolder ? item.substring(0, item.length - 3) : item;
+              return (
+                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '13px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                  {isFolder ? <Folder size={14} color="var(--accent-blue)" /> : <FileText size={14} color="var(--text-tertiary)" />}
+                  <span>{displayPath} {isFolder ? '(Recursive)' : ''}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Logs ────────────────────────── */}
       <div className="card">

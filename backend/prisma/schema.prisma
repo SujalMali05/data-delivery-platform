@@ -114,6 +114,7 @@ model Transfer {
   bandwidthLimit String? @map("bandwidth_limit")
   skipDeletion   Boolean @default(false) @map("skip_deletion")
   dryRunReport   Json?   @map("dry_run_report")
+  selectedItems  Json?   @map("selected_items")
 
   // Progress Tracking
   totalBytes       BigInt @default(0) @map("total_bytes")

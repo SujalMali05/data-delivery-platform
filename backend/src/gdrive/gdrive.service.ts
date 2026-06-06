@@ -176,6 +176,7 @@ export class GdriveService implements OnApplicationBootstrap {
     path: string = '',
     sharedDriveId?: string,
     authType?: 'SERVICE_ACCOUNT' | 'OAUTH',
+    showFiles?: boolean,
   ) {
     const tempJobId = `browse-${Date.now()}`;
     let remoteName = '';
@@ -212,13 +213,14 @@ export class GdriveService implements OnApplicationBootstrap {
       );
 
       const list = response.list || [];
-      return list
-        .filter((item: any) => item.IsDir)
-        .map((item: any) => ({
-          name: item.Name,
-          path: item.Path,
-          id: item.ID || null,
-        }));
+      const filtered = showFiles ? list : list.filter((item: any) => item.IsDir);
+      return filtered.map((item: any) => ({
+        name: item.Name,
+        path: item.Path,
+        isDir: item.IsDir,
+        id: item.ID || null,
+        size: item.Size || 0,
+      }));
     } catch (error: any) {
       this.logger.error(`Error browsing Google Drive path: ${error.message}`);
       throw new Error(`Failed to browse Google Drive: ${error.message}`);

@@ -177,6 +177,7 @@ export class CustomersService {
     region: string,
     externalId: string | null,
     path: string = '',
+    showFiles?: boolean,
   ) {
     const tempJobId = `browse-${Date.now()}`;
     let remoteName = '';
@@ -202,17 +203,18 @@ export class CustomersService {
       );
 
       const list = response.list || [];
-      return list
-        .filter((item: any) => item.IsDir)
-        .map((item: any) => {
-          const relativePath = item.Path.startsWith(bucketName + '/')
-            ? item.Path.substring(bucketName.length + 1)
-            : item.Path;
-          return {
-            name: item.Name,
-            path: relativePath,
-          };
-        });
+      const filtered = showFiles ? list : list.filter((item: any) => item.IsDir);
+      return filtered.map((item: any) => {
+        const relativePath = item.Path.startsWith(bucketName + '/')
+          ? item.Path.substring(bucketName.length + 1)
+          : item.Path;
+        return {
+          name: item.Name,
+          path: relativePath,
+          isDir: item.IsDir,
+          size: item.Size || 0,
+        };
+      });
     } catch (error: any) {
       this.logger.error(`Error browsing S3 bucket path: ${error.message}`);
       throw new Error(`Failed to browse S3: ${error.message}`);

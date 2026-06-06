@@ -95,6 +95,7 @@ export class RcloneService {
       retries?: number;
       bandwidthLimit?: string;
       skipDeletion?: boolean;
+      filterFrom?: string;
     },
   ): Promise<RcloneJobResult> {
     // If skipDeletion is enabled for sync, we perform copy instead of sync to prevent deleting any files on destination
@@ -117,6 +118,7 @@ export class RcloneService {
     if (options?.checkers) payload['--checkers'] = options.checkers;
     if (options?.retries) payload['--retries'] = options.retries;
     if (options?.bandwidthLimit) payload['--bwlimit'] = options.bandwidthLimit;
+    if (options?.filterFrom) payload['--filter-from'] = options.filterFrom;
 
     // Add performance optimizations for S3 and Google Drive transfers
     payload['--buffer-size'] = '64M';
@@ -152,7 +154,7 @@ export class RcloneService {
     dstFs: string,
     group: string,
     mode: 'copy' | 'sync' | 'move',
-    options?: { checkers?: number },
+    options?: { checkers?: number; filterFrom?: string },
   ): Promise<RcloneJobResult> {
     const payload: any = {
       command: mode,
@@ -170,6 +172,7 @@ export class RcloneService {
     };
 
     if (options?.checkers) payload.arg.push(`--checkers=${options.checkers}`);
+    if (options?.filterFrom) payload.arg.push(`--filter-from=${options.filterFrom}`);
 
     this.logger.log(
       `Starting rclone dry-run ${mode} via core/command: ${srcFs} → ${dstFs} (group: ${group})`,

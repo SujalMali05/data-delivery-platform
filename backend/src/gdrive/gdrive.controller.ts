@@ -57,12 +57,14 @@ export class GdriveController {
       path?: string;
       sharedDriveId?: string;
       authType?: 'SERVICE_ACCOUNT' | 'OAUTH';
+      showFiles?: boolean;
     },
   ) {
     return this.gdriveService.browsePath(
       body.path,
       body.sharedDriveId,
       body.authType,
+      body.showFiles,
     );
   }
 
