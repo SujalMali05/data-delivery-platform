@@ -12,6 +12,7 @@ import {
   Loader2,
   AlertTriangle,
   FolderOpen,
+  Download,
 } from 'lucide-react';
 
 interface Customer {
@@ -43,6 +44,9 @@ export default function S3BrowserPage() {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(50);
   const [filterText, setFilterText] = useState<string>('');
+
+  // Download tracking state
+  const [downloading, setDownloading] = useState<Record<string, boolean>>({});
 
   // Load customers list on mount
   useEffect(() => {
@@ -131,6 +135,33 @@ export default function S3BrowserPage() {
   const handleBreadcrumbRootClick = () => {
     setPath('');
     setPage(1);
+  };
+
+  const handleDownload = async (fileKey: string, fileName: string) => {
+    setDownloading((prev) => ({ ...prev, [fileKey]: true }));
+    try {
+      const response = await customersApi.downloadObject(selectedCustomerId, fileKey);
+      
+      const contentTypeHeader = response.headers ? response.headers['content-type'] : undefined;
+      const contentType = typeof contentTypeHeader === 'string' ? contentTypeHeader : 'application/octet-stream';
+      
+      const blob = new Blob([response.data], { type: contentType });
+      const url = window.URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      
+      link.parentNode?.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      console.error('Download failed:', err);
+      alert(`Download failed: ${err.response?.data?.message || err.message || 'Unknown error'}`);
+    } finally {
+      setDownloading((prev) => ({ ...prev, [fileKey]: false }));
+    }
   };
 
   // Filter items locally by search query
@@ -285,6 +316,7 @@ export default function S3BrowserPage() {
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Name</th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px' }}>Size</th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '200px' }}>Last Modified</th>
+                    <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -325,6 +357,37 @@ export default function S3BrowserPage() {
                       {/* Last Modified */}
                       <td style={{ padding: '12px 20px', color: 'var(--text-tertiary)' }}>
                         {item.isDir ? '—' : formatDate(item.modTime)}
+                      </td>
+
+                      {/* Actions */}
+                      <td style={{ padding: '12px 20px', textAlign: 'right' }}>
+                        {!item.isDir && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDownload(item.path, item.name);
+                            }}
+                            className="btn-secondary"
+                            style={{
+                              padding: '4px 8px',
+                              borderRadius: '6px',
+                              fontSize: '11px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              height: '28px',
+                              cursor: downloading[item.path] ? 'not-allowed' : 'pointer'
+                            }}
+                            disabled={downloading[item.path]}
+                          >
+                            {downloading[item.path] ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Download size={12} />
+                            )}
+                            Download
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}

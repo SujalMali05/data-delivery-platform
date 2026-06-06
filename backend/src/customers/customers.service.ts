@@ -2,6 +2,7 @@ import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
 import { StsService } from '../aws/sts.service';
+import { S3Client, GetObjectCommand } from '@aws-sdk/client-s3';
 import { S3ValidatorService } from '../aws/s3-validator.service';
 import { RcloneService } from '../rclone/rclone.service';
 import { RcloneConfigService } from '../rclone/rclone-config.service';
@@ -408,5 +409,54 @@ export class CustomersService {
         await this.rcloneConfig.cleanupRemotes(tempJobId);
       }
     }
+  }
+
+  /**
+   * Get GetObject stream for an S3 object
+   */
+  async getObjectStream(customerId: string, objectKey: string) {
+    const customer = await this.prisma.customer.findUnique({
+      where: { id: customerId },
+    });
+    if (!customer) {
+      throw new NotFoundException('Customer not found');
+    }
+
+    const credentials = await this.stsService.assumeRole(
+      customer.roleArn,
+      customer.externalId || undefined,
+    );
+
+    const s3 = new S3Client({
+      region: customer.region,
+      credentials: {
+        accessKeyId: credentials.accessKeyId,
+        secretAccessKey: credentials.secretAccessKey,
+        sessionToken: credentials.sessionToken,
+      },
+    });
+
+    const basePrefix = customer.prefixPath
+      ? customer.prefixPath.trim().replace(/^\/|\/$/g, '')
+      : '';
+    const searchPath = objectKey ? objectKey.trim().replace(/^\/|\/$/g, '') : '';
+
+    let key = '';
+    if (basePrefix) {
+      key += `${basePrefix}/`;
+    }
+    key += searchPath;
+
+    const command = new GetObjectCommand({
+      Bucket: customer.bucketName,
+      Key: key,
+    });
+
+    const s3Response = await s3.send(command);
+    return {
+      stream: s3Response.Body,
+      contentType: s3Response.ContentType,
+      contentLength: s3Response.ContentLength,
+    };
   }
 }

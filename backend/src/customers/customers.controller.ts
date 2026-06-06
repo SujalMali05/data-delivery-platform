@@ -105,4 +105,34 @@ export class CustomersController {
       body.limit || 50,
     );
   }
+
+  @Post('download-object')
+  async downloadObject(
+    @Body()
+    body: {
+      customerId: string;
+      path: string;
+    },
+    @Res() res: any,
+  ) {
+    try {
+      const { stream, contentType, contentLength } =
+        await this.customersService.getObjectStream(body.customerId, body.path);
+
+      const filename = body.path.split('/').pop() || 'file';
+
+      res.setHeader('Content-Type', contentType || 'application/octet-stream');
+      if (contentLength) {
+        res.setHeader('Content-Length', contentLength.toString());
+      }
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(filename)}"`,
+      );
+
+      (stream as any).pipe(res);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  }
 }
