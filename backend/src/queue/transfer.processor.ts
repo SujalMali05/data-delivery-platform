@@ -130,7 +130,7 @@ export class TransferProcessor extends WorkerHost {
                 `Reconnecting: Google Drive remote ${gdriveRemoteName} is missing in rclone. Re-creating...`,
               );
               const sourceAuthType =
-                transfer.source.authType || 'SERVICE_ACCOUNT';
+                transfer.source.authType || 'OAUTH';
               await this.rcloneConfig.createGdriveRemote(transferId, {
                 serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
                 teamDriveId: transfer.source.sharedDriveId || undefined,
@@ -197,7 +197,7 @@ export class TransferProcessor extends WorkerHost {
 
             // ── Step 3: Create dynamic rclone remotes ─────────────
             const sourceAuthType =
-              transfer.source.authType || 'SERVICE_ACCOUNT';
+              transfer.source.authType || 'OAUTH';
             gdriveRemote = await this.rcloneConfig.createGdriveRemote(
               transferId,
               {

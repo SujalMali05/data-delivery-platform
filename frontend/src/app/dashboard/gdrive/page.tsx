@@ -17,7 +17,7 @@ export default function GdrivePage() {
     drivePath: '',
     driveType: 'MY_DRIVE',
     sharedDriveId: '',
-    authType: 'SERVICE_ACCOUNT',
+    authType: 'OAUTH',
   });
 
   useEffect(() => {
@@ -28,7 +28,7 @@ export default function GdrivePage() {
   useEffect(() => {
     setFormData((prev) => ({
       ...prev,
-      authType: activeTab === 'PULL' ? 'OAUTH' : 'SERVICE_ACCOUNT',
+      authType: 'OAUTH',
     }));
   }, [activeTab]);
 
@@ -37,12 +37,13 @@ export default function GdrivePage() {
     try {
       await gdriveApi.createSource({
         ...formData,
+        direction: activeTab,
         sharedDriveId: formData.sharedDriveId || undefined,
       });
       setShowForm(false);
       setFormData({
         name: '', drivePath: '', driveType: 'MY_DRIVE', sharedDriveId: '',
-        authType: activeTab === 'PULL' ? 'OAUTH' : 'SERVICE_ACCOUNT',
+        authType: 'OAUTH',
       });
       const r = await gdriveApi.sources();
       setSources(r.data);
@@ -78,7 +79,7 @@ export default function GdrivePage() {
             rclone: {status?.rcloneConnected ? '✅ Connected' : '❌ Not Connected'}
           </p>
           <p style={{ fontSize: '12px', color: 'var(--text-tertiary)' }}>
-            Service Account: {status?.serviceAccountConfigured ? 'Configured' : 'Not Configured'}
+            OAuth2 Token: {status?.oauthConfigured ? 'Configured' : 'Not Configured'}
           </p>
         </div>
       </div>
@@ -99,7 +100,7 @@ export default function GdrivePage() {
             transition: 'all 0.2s',
           }}
         >
-          Pull Sources (OAuth2 Token)
+          Pull Sources (S3 ➔ Google Drive)
         </button>
         <button
           onClick={() => setActiveTab('PUSH')}
@@ -115,7 +116,7 @@ export default function GdrivePage() {
             transition: 'all 0.2s',
           }}
         >
-          Push Sources (Service Account)
+          Push Sources (Google Drive ➔ S3)
         </button>
       </div>
 
@@ -123,33 +124,9 @@ export default function GdrivePage() {
       {showForm && (
         <div className="card" style={{ marginBottom: '20px' }}>
           <h3 style={{ fontSize: '16px', fontWeight: 600, marginBottom: '16px' }}>
-            Add Google Drive Source ({activeTab === 'PULL' ? 'Pull / OAuth2' : 'Push / Service Account'})
+            Add Google Drive Source ({activeTab === 'PULL' ? 'Pull (S3 ➔ GDrive)' : 'Push (GDrive ➔ S3)'})
           </h3>
           <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '12px 16px', borderRadius: '8px', border: '1px solid var(--border-secondary)', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>
-                Authentication Method
-              </span>
-              <span style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px', marginTop: '2px' }}>
-                {activeTab === 'PULL' ? (
-                  <>
-                    <UserCheck size={16} style={{ color: 'var(--accent-emerald)' }} />
-                    OAuth2 User Token (Classified as Pull — S3 ➔ Google Drive)
-                  </>
-                ) : (
-                  <>
-                    <KeyRound size={16} style={{ color: 'var(--accent-blue)' }} />
-                    Service Account (Classified as Push — Google Drive ➔ S3)
-                  </>
-                )}
-              </span>
-              <p style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px', margin: 0 }}>
-                {activeTab === 'PULL'
-                  ? 'Uses the platform\'s OAuth2 user credentials config. Required for write/upload access to Google Drive.'
-                  : 'Uses the platform\'s service account credentials config. Required for read/download access from shared folders.'}
-              </p>
-            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
               <div>
@@ -190,17 +167,15 @@ export default function GdrivePage() {
       {/* Sources List */}
       <div style={{ display: 'grid', gap: '12px' }}>
         {sources
-          .filter((source: any) =>
-            activeTab === 'PULL' ? source.authType === 'OAUTH' : source.authType === 'SERVICE_ACCOUNT'
-          )
+          .filter((source: any) => {
+            const dir = source.direction || (source.authType === 'OAUTH' ? 'PULL' : 'PUSH');
+            return dir === activeTab;
+          })
           .map((source: any) => (
             <div key={source.id} className="card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: source.authType === 'OAUTH' ? 'rgba(16,185,129,0.1)' : 'rgba(99,102,241,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {source.authType === 'OAUTH'
-                    ? <UserCheck size={18} style={{ color: 'var(--accent-emerald)' }} />
-                    : <FolderOpen size={18} style={{ color: 'var(--accent-blue)' }} />
-                  }
+                <div style={{ width: '40px', height: '40px', borderRadius: '10px', background: 'rgba(16,185,129,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <UserCheck size={18} style={{ color: 'var(--accent-emerald)' }} />
                 </div>
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -210,12 +185,12 @@ export default function GdrivePage() {
                       fontWeight: 600,
                       padding: '2px 6px',
                       borderRadius: '4px',
-                      background: source.authType === 'OAUTH' ? 'rgba(16,185,129,0.15)' : 'rgba(99,102,241,0.15)',
-                      color: source.authType === 'OAUTH' ? 'var(--accent-emerald)' : 'var(--accent-blue)',
+                      background: 'rgba(16,185,129,0.15)',
+                      color: 'var(--accent-emerald)',
                       textTransform: 'uppercase',
                       letterSpacing: '0.5px',
                     }}>
-                      {source.authType === 'OAUTH' ? 'OAuth2' : 'Service Acct'}
+                      OAuth2
                     </span>
                   </div>
                   <p style={{ fontSize: '13px', color: 'var(--text-tertiary)', fontFamily: 'monospace' }}>
@@ -231,9 +206,10 @@ export default function GdrivePage() {
               </div>
             </div>
           ))}
-        {sources.filter((source: any) =>
-          activeTab === 'PULL' ? source.authType === 'OAUTH' : source.authType === 'SERVICE_ACCOUNT'
-        ).length === 0 && (
+        {sources.filter((source: any) => {
+          const dir = source.direction || (source.authType === 'OAUTH' ? 'PULL' : 'PUSH');
+          return dir === activeTab;
+        }).length === 0 && (
           <div className="card" style={{ textAlign: 'center', padding: '40px', color: 'var(--text-tertiary)' }}>
             <HardDrive size={32} style={{ margin: '0 auto 12px', opacity: 0.3 }} />
             <p>No {activeTab === 'PULL' ? 'Pull' : 'Push'} sources configured yet</p>

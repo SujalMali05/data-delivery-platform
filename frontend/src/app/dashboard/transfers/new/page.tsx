@@ -148,10 +148,11 @@ export default function NewTransferPage() {
 
   const selectedCustomer = customers.find((c: any) => c.id === form.customerId);
 
-  // Filter sources based on direction + auth type
-  const filteredSources = sources.filter((s: any) =>
-    form.direction === 'PULL' ? s.authType === 'OAUTH' : s.authType === 'SERVICE_ACCOUNT',
-  );
+  // Filter sources based on direction
+  const filteredSources = sources.filter((s: any) => {
+    const sourceDir = s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH');
+    return sourceDir === form.direction;
+  });
 
   const canProceedStep3 =
     form.name && form.sourceId && form.customerId && form.destinationPath;
@@ -344,7 +345,7 @@ export default function NewTransferPage() {
                     color: 'var(--accent-blue)',
                     alignSelf: 'flex-start',
                   }}>
-                    <Shield size={12} /> Service Account Authentication
+                    <Shield size={12} /> User OAuth2 Credentials
                   </div>
                 </div>
 
@@ -693,7 +694,7 @@ export default function NewTransferPage() {
                         </select>
                         {filteredSources.length === 0 && (
                           <span style={{ fontSize: '11px', color: 'var(--accent-amber)', marginTop: '4px' }}>
-                            No {form.direction === 'PULL' ? 'OAuth' : 'Service Account'} connections registered.
+                            No Google Drive sources configured for this direction.
                           </span>
                         )}
                       </div>

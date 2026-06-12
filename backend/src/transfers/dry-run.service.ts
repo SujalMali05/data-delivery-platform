@@ -86,7 +86,7 @@ export class DryRunService {
       );
 
       // 3. Create temporary rclone remotes
-      const sourceAuthType = source.authType || 'SERVICE_ACCOUNT';
+      const sourceAuthType = source.authType || 'OAUTH';
       gdriveRemote = await this.rcloneConfig.createGdriveRemote(dryRunId, {
         serviceAccountFile: process.env.GOOGLE_SERVICE_ACCOUNT_FILE,
         teamDriveId: source.sharedDriveId || undefined,

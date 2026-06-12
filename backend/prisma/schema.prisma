@@ -57,22 +57,28 @@ model Customer {
 // ── Google Drive Source ────────────────────────────────────────────────────────
 
 model GoogleDriveSource {
-  id            String         @id @default(uuid())
+  id            String          @id @default(uuid())
   name          String
-  drivePath     String         @map("drive_path")
-  driveType     DriveType      @default(MY_DRIVE) @map("drive_type")
-  sharedDriveId String?        @map("shared_drive_id")
-  authType      GdriveAuthType @default(SERVICE_ACCOUNT) @map("auth_type")
-  clientId      String?        @map("client_id")
-  clientSecret  String?        @map("client_secret")
-  tokenJson     String?        @map("token_json")
-  createdAt     DateTime       @default(now()) @map("created_at")
-  updatedAt     DateTime       @updatedAt @map("updated_at")
+  drivePath     String          @map("drive_path")
+  driveType     DriveType       @default(MY_DRIVE) @map("drive_type")
+  sharedDriveId String?         @map("shared_drive_id")
+  authType      GdriveAuthType  @default(SERVICE_ACCOUNT) @map("auth_type")
+  direction     GdriveDirection @default(PUSH) @map("direction")
+  clientId      String?         @map("client_id")
+  clientSecret  String?         @map("client_secret")
+  tokenJson     String?         @map("token_json")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
 
   transfers Transfer[]
   validations Validation[]
 
   @@map("google_drive_sources")
+}
+
+enum GdriveDirection {
+  PUSH
+  PULL
 }
 
 enum GdriveAuthType {

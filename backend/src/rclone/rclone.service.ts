@@ -407,7 +407,7 @@ export class RcloneService {
           opt,
         },
         {
-          timeout: 120000, // 2 minutes timeout for listing
+          timeout: 600000, // 10 minutes timeout for listing
         },
       );
       return response.data;
@@ -695,9 +695,10 @@ export class RcloneService {
    * Scan directory recursively, identify WAV files, and calculate their durations.
    * Reports progress in real-time.
    */
-  async calculateWavDurationOfPath(
+  async calculateWavDurationForList(
     fs: string,
-    remote: string,
+    wavFiles: any[],
+    skippedCount: number,
     onProgress?: (progress: {
       scanned: number;
       total: number;
@@ -714,21 +715,6 @@ export class RcloneService {
     }>;
     skippedCount: number;
   }> {
-    this.logger.log(`Listing files for WAV analysis: ${fs} ${remote}`);
-    const dirList = await this.listDirectory(fs, remote, { recurse: true });
-    const list = dirList.list || [];
-
-    const wavFiles = list.filter(
-      (item: any) => !item.IsDir && item.Name.toLowerCase().endsWith('.wav'),
-    );
-    const skippedCount = list.filter(
-      (item: any) => !item.IsDir && !item.Name.toLowerCase().endsWith('.wav'),
-    ).length;
-
-    this.logger.log(
-      `Found ${wavFiles.length} WAV files to analyze out of ${list.length} total objects`,
-    );
-
     const files: Array<{
       name: string;
       path: string;
@@ -796,5 +782,47 @@ export class RcloneService {
       files: files.sort((a, b) => a.path.localeCompare(b.path)),
       skippedCount,
     };
+  }
+
+  async calculateWavDurationOfPath(
+    fs: string,
+    remote: string,
+    onProgress?: (progress: {
+      scanned: number;
+      total: number;
+      currentFile: string;
+    }) => void,
+  ): Promise<{
+    totalDuration: number;
+    wavCount: number;
+    files: Array<{
+      name: string;
+      path: string;
+      size: number;
+      duration: number;
+    }>;
+    skippedCount: number;
+  }> {
+    this.logger.log(`Listing files for WAV analysis: ${fs} ${remote}`);
+    const dirList = await this.listDirectory(fs, remote, { recurse: true });
+    const list = dirList.list || [];
+
+    const wavFiles = list.filter(
+      (item: any) => !item.IsDir && item.Name.toLowerCase().endsWith('.wav'),
+    );
+    const skippedCount = list.filter(
+      (item: any) => !item.IsDir && !item.Name.toLowerCase().endsWith('.wav'),
+    ).length;
+
+    this.logger.log(
+      `Found ${wavFiles.length} WAV files to analyze out of ${list.length} total objects`,
+    );
+
+    return this.calculateWavDurationForList(
+      fs,
+      wavFiles,
+      skippedCount,
+      onProgress,
+    );
   }
 }

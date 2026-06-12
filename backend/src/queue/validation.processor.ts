@@ -71,7 +71,7 @@ export class ValidationProcessor extends WorkerHost {
 
       // 3. Create Dynamic Rclone Remotes
       const remoteNamespace = `val-${validationId}`;
-      const sourceAuthType = validation.source.authType || 'SERVICE_ACCOUNT';
+      const sourceAuthType = validation.source.authType || 'OAUTH';
 
       gdriveRemote = await this.rcloneConfig.createGdriveRemote(
         remoteNamespace,

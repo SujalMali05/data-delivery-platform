@@ -72,6 +72,11 @@ export default function AudioAnalyzerPage() {
   const [path, setPath] = useState('');
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
 
+  // Subsection / Tab State
+  const [activeSubSection, setActiveSubSection] = useState<'single' | 'compare'>('single');
+  const [audioFolderLink, setAudioFolderLink] = useState('');
+  const [transcriptFolderLink, setTranscriptFolderLink] = useState('');
+
   // Search & sorting state
   const [searchQuery, setSearchQuery] = useState('');
   const [sortField, setSortField] = useState<'path' | 'size' | 'duration'>('path');
@@ -94,8 +99,8 @@ export default function AudioAnalyzerPage() {
   const selectedSource = selectedSourceId.startsWith('GLOBAL_')
     ? {
         id: selectedSourceId,
-        name: selectedSourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'Global Service Account' : 'Global User Account',
-        authType: selectedSourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'SERVICE_ACCOUNT' : 'OAUTH',
+        name: 'Global User Account',
+        authType: 'OAUTH',
         drivePath: '',
       }
     : sources.find((s: any) => s.id === selectedSourceId);
@@ -151,25 +156,34 @@ export default function AudioAnalyzerPage() {
     if (!isCustomName) {
       const dateStr = new Date().toISOString().split('T')[0];
       const timeStr = new Date().toTimeString().split(' ')[0].substring(0, 5); // HH:MM
-      if (type === 'S3') {
-        const custName = selectedCustomer ? selectedCustomer.name : '';
-        if (custName) {
-          const pathSnippet = path ? ` - ${path}` : '';
-          setCalculationName(`S3: ${custName}${pathSnippet} (${dateStr} ${timeStr})`);
+      if (activeSubSection === 'compare') {
+        const srcName = selectedSource ? selectedSource.name : '';
+        if (srcName) {
+          setCalculationName(`Match GDrive: ${srcName} (${dateStr} ${timeStr})`);
         } else {
           setCalculationName('');
         }
       } else {
-        const srcName = selectedSource ? selectedSource.name : '';
-        if (srcName) {
-          const pathSnippet = path ? ` - ${path}` : '';
-          setCalculationName(`GDrive: ${srcName}${pathSnippet} (${dateStr} ${timeStr})`);
+        if (type === 'S3') {
+          const custName = selectedCustomer ? selectedCustomer.name : '';
+          if (custName) {
+            const pathSnippet = path ? ` - ${path}` : '';
+            setCalculationName(`S3: ${custName}${pathSnippet} (${dateStr} ${timeStr})`);
+          } else {
+            setCalculationName('');
+          }
         } else {
-          setCalculationName('');
+          const srcName = selectedSource ? selectedSource.name : '';
+          if (srcName) {
+            const pathSnippet = path ? ` - ${path}` : '';
+            setCalculationName(`GDrive: ${srcName}${pathSnippet} (${dateStr} ${timeStr})`);
+          } else {
+            setCalculationName('');
+          }
         }
       }
     }
-  }, [type, selectedCustomerId, selectedSourceId, path, isCustomName, selectedCustomer, selectedSource]);
+  }, [type, activeSubSection, selectedCustomerId, selectedSourceId, path, isCustomName, selectedCustomer, selectedSource]);
 
   const handleLoadHistory = async (id: string, silent = false) => {
     if (!silent) {
@@ -240,18 +254,10 @@ export default function AudioAnalyzerPage() {
 
     try {
       let params: any = {};
-      if (type === 'S3') {
-        const customer = customers.find((c: any) => c.id === selectedCustomerId);
-        if (!customer) throw new Error('Please select a customer first.');
+      let storageType: string = type;
+      let finalPath = path;
 
-        params = {
-          roleArn: customer.roleArn,
-          bucketName: customer.bucketName,
-          region: customer.region,
-          externalId: customer.externalId || null,
-          path: path,
-        };
-      } else {
+      if (activeSubSection === 'compare') {
         const source = selectedSourceId.startsWith('GLOBAL_')
           ? {
               id: selectedSourceId,
@@ -260,24 +266,59 @@ export default function AudioAnalyzerPage() {
             }
           : sources.find((s: any) => s.id === selectedSourceId);
         if (!source) throw new Error('Please select a Google Drive source first.');
+        if (!audioFolderLink.trim()) throw new Error('Please enter Google Drive Audio folder link.');
+        if (!transcriptFolderLink.trim()) throw new Error('Please enter Google Drive Transcription folder link.');
 
         params = {
-          path: path,
+          audioFolderLink: audioFolderLink.trim(),
+          transcriptFolderLink: transcriptFolderLink.trim(),
           sharedDriveId: source.sharedDriveId || undefined,
           authType: source.authType,
         };
+        storageType = 'GDriveCompare';
+        finalPath = audioFolderLink.trim();
+      } else {
+        if (type === 'S3') {
+          const customer = customers.find((c: any) => c.id === selectedCustomerId);
+          if (!customer) throw new Error('Please select a customer first.');
+
+          params = {
+            roleArn: customer.roleArn,
+            bucketName: customer.bucketName,
+            region: customer.region,
+            externalId: customer.externalId || null,
+            path: path,
+          };
+        } else {
+          const source = selectedSourceId.startsWith('GLOBAL_')
+            ? {
+                id: selectedSourceId,
+                authType: selectedSourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'SERVICE_ACCOUNT' : 'OAUTH',
+                sharedDriveId: undefined,
+              }
+            : sources.find((s: any) => s.id === selectedSourceId);
+          if (!source) throw new Error('Please select a Google Drive source first.');
+
+          params = {
+            path: path,
+            sharedDriveId: source.sharedDriveId || undefined,
+            authType: source.authType,
+          };
+        }
       }
 
       const finalName = calculationName.trim() || `Scan on ${new Date().toLocaleString()}`;
-      const sourceName = type === 'S3' 
-        ? (selectedCustomer ? selectedCustomer.name : 'S3') 
-        : (selectedSource ? selectedSource.name : 'GDrive');
+      const sourceName = activeSubSection === 'compare'
+        ? (selectedSource ? selectedSource.name : 'GDrive')
+        : (type === 'S3' 
+          ? (selectedCustomer ? selectedCustomer.name : 'S3') 
+          : (selectedSource ? selectedSource.name : 'GDrive'));
 
       // Create background calculation job
       const res = await wavCalculationsApi.create({
         name: finalName,
-        storageType: type,
-        targetPath: path,
+        storageType: storageType,
+        targetPath: finalPath,
         sourceName,
         parameters: params,
       });
@@ -313,6 +354,14 @@ export default function AudioAnalyzerPage() {
     if (m > 0) parts.push(`${m}m`);
     if (s > 0 || parts.length === 0) parts.push(`${s}s`);
     return parts.join(' ');
+  };
+
+  const formatDurationHMS = (seconds: number) => {
+    if (seconds === undefined || seconds === null || seconds <= 0) return '00:00:00';
+    const h = Math.floor(seconds / 3600);
+    const m = Math.floor((seconds % 3600) / 60);
+    const s = Math.round(seconds % 60);
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
   const formatTrackTime = (seconds: number) => {
@@ -483,21 +532,16 @@ export default function AudioAnalyzerPage() {
           
           {/* Analysis Target Form Card */}
           <div className="card" style={{ display: 'flex', flexDirection: 'column', gap: '24px', padding: '28px' }}>
-            <h2 style={{ fontSize: '16px', fontWeight: 600, borderBottom: '1px solid var(--border-secondary)', paddingBottom: '12px', marginBottom: '4px' }}>
-              Analysis Target
-            </h2>
-
-            {/* Storage Type Toggle */}
-            <div>
-              <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                Storage Location
-              </label>
+            {/* Analyzer Subsections */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <h2 style={{ fontSize: '16px', fontWeight: 600, borderBottom: '1px solid var(--border-secondary)', paddingBottom: '12px', margin: 0 }}>
+                Audio Analyzer Mode
+              </h2>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-secondary)' }}>
                 <button
                   type="button"
                   onClick={() => {
-                    setType('S3');
-                    setPath('');
+                    setActiveSubSection('single');
                     setResult(null);
                     setError('');
                   }}
@@ -505,133 +549,256 @@ export default function AudioAnalyzerPage() {
                     padding: '8px',
                     borderRadius: '6px',
                     border: 'none',
-                    background: type === 'S3' ? 'var(--gradient-primary)' : 'transparent',
-                    color: type === 'S3' ? '#ffffff' : 'var(--text-secondary)',
+                    background: activeSubSection === 'single' ? 'var(--gradient-primary)' : 'transparent',
+                    color: activeSubSection === 'single' ? '#ffffff' : 'var(--text-secondary)',
                     fontWeight: 600,
-                    fontSize: '13px',
+                    fontSize: '12px',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  Customer S3
+                  Folder Calculator
                 </button>
                 <button
                   type="button"
                   onClick={() => {
-                    setType('GDrive');
-                    setPath('');
+                    setActiveSubSection('compare');
                     setResult(null);
                     setError('');
-                    setSelectedSourceId('GLOBAL_SERVICE_ACCOUNT');
+                    setSelectedSourceId('GLOBAL_OAUTH');
                   }}
                   style={{
                     padding: '8px',
                     borderRadius: '6px',
                     border: 'none',
-                    background: type === 'GDrive' ? 'var(--gradient-primary)' : 'transparent',
-                    color: type === 'GDrive' ? '#ffffff' : 'var(--text-secondary)',
+                    background: activeSubSection === 'compare' ? 'var(--gradient-primary)' : 'transparent',
+                    color: activeSubSection === 'compare' ? '#ffffff' : 'var(--text-secondary)',
                     fontWeight: 600,
-                    fontSize: '13px',
+                    fontSize: '12px',
                     cursor: 'pointer',
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  Google Drive
+                  Transcription Match
                 </button>
               </div>
             </div>
 
             <form onSubmit={handleAnalyze} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-              {/* Source Selector */}
-              {type === 'S3' ? (
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    Customer S3 Bucket *
-                  </label>
-                  <select
-                    className="select"
-                    value={selectedCustomerId}
-                    onChange={(e) => {
-                      setSelectedCustomerId(e.target.value);
-                      setResult(null);
-                      setError('');
-                    }}
-                    required
-                  >
-                    <option value="">Select customer bucket...</option>
-                    {customers.map((c: any) => (
-                      <option key={c.id} value={c.id}>{c.name} ({c.bucketName})</option>
-                    ))}
-                  </select>
-                </div>
-              ) : (
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
-                    Google Drive Source *
-                  </label>
-                  <select
-                    className="select"
-                    value={selectedSourceId}
-                    onChange={(e) => {
-                      setSelectedSourceId(e.target.value);
-                      setResult(null);
-                      setError('');
-                    }}
-                    required
-                  >
-                    <option value="GLOBAL_SERVICE_ACCOUNT">Global Service Account (Service Account)</option>
-                    <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
-                    <optgroup label="Saved Pull Sources (OAuth2)">
-                      {sources.filter((s: any) => s.authType === 'OAUTH').map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Saved Push Sources (Service Account)">
-                      {sources.filter((s: any) => s.authType === 'SERVICE_ACCOUNT').map((s: any) => (
-                        <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
-              )}
+              {activeSubSection === 'single' ? (
+                <>
+                  {/* Storage Type Toggle */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      Storage Location
+                    </label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', background: 'var(--bg-secondary)', padding: '4px', borderRadius: '8px', border: '1px solid var(--border-secondary)' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setType('S3');
+                          setPath('');
+                          setResult(null);
+                          setError('');
+                        }}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: type === 'S3' ? 'var(--gradient-primary)' : 'transparent',
+                          color: type === 'S3' ? '#ffffff' : 'var(--text-secondary)',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        Customer S3
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setType('GDrive');
+                          setPath('');
+                          setResult(null);
+                          setError('');
+                          setSelectedSourceId('GLOBAL_OAUTH');
+                        }}
+                        style={{
+                          padding: '8px',
+                          borderRadius: '6px',
+                          border: 'none',
+                          background: type === 'GDrive' ? 'var(--gradient-primary)' : 'transparent',
+                          color: type === 'GDrive' ? '#ffffff' : 'var(--text-secondary)',
+                          fontWeight: 600,
+                          fontSize: '13px',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        Google Drive
+                      </button>
+                    </div>
+                  </div>
 
-              {/* Path Selection */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
-                  Folder Path (Prefix)
-                </label>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
-                  <input
-                    className="input"
-                    placeholder={type === 'S3' ? 'e.g., Stark_Maptix/Audio' : 'e.g., Audio/Project Marvel'}
-                    value={path}
-                    onChange={(e) => {
-                      setPath(e.target.value);
-                      setResult(null);
-                    }}
-                    style={{ flex: 1, minWidth: 0 }}
-                  />
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => {
-                      if (type === 'S3' && !selectedCustomerId) {
-                        alert('Please select a customer bucket first.');
-                        return;
-                      }
-                      if (type === 'GDrive' && !selectedSourceId) {
-                        alert('Please select a Google Drive source first.');
-                        return;
-                      }
-                      setIsBrowserOpen(true);
-                    }}
-                    style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, fontSize: '13px' }}
-                  >
-                    <FolderOpen size={14} />
-                    Browse
-                  </button>
-                </div>
-              </div>
+                  {/* Source Selector */}
+                  {type === 'S3' ? (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                        Customer S3 Bucket *
+                      </label>
+                      <select
+                        className="select"
+                        value={selectedCustomerId}
+                        onChange={(e) => {
+                          setSelectedCustomerId(e.target.value);
+                          setResult(null);
+                          setError('');
+                        }}
+                        required
+                      >
+                        <option value="">Select customer bucket...</option>
+                        {customers.map((c: any) => (
+                          <option key={c.id} value={c.id}>{c.name} ({c.bucketName})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                        Google Drive Source *
+                      </label>
+                      <select
+                        className="select"
+                        value={selectedSourceId}
+                        onChange={(e) => {
+                          setSelectedSourceId(e.target.value);
+                          setResult(null);
+                          setError('');
+                        }}
+                        required
+                      >
+                        <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
+                        <optgroup label="Saved Pull Sources">
+                          {sources.filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL').map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                          ))}
+                        </optgroup>
+                        <optgroup label="Saved Push Sources">
+                          {sources.filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH').map((s: any) => (
+                            <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                          ))}
+                        </optgroup>
+                      </select>
+                    </div>
+                  )}
+
+                  {/* Path Selection */}
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)' }}>
+                      Folder Path (Prefix)
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', alignItems: 'stretch' }}>
+                      <input
+                        className="input"
+                        placeholder={type === 'S3' ? 'e.g., Stark_Maptix/Audio' : 'e.g., Audio/Project Marvel'}
+                        value={path}
+                        onChange={(e) => {
+                          setPath(e.target.value);
+                          setResult(null);
+                        }}
+                        style={{ flex: 1, minWidth: 0 }}
+                      />
+                      <button
+                        type="button"
+                        className="btn-secondary"
+                        onClick={() => {
+                          if (type === 'S3' && !selectedCustomerId) {
+                            alert('Please select a customer bucket first.');
+                            return;
+                          }
+                          if (type === 'GDrive' && !selectedSourceId) {
+                            alert('Please select a Google Drive source first.');
+                            return;
+                          }
+                          setIsBrowserOpen(true);
+                        }}
+                        style={{ padding: '0 16px', display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, fontSize: '13px' }}
+                      >
+                        <FolderOpen size={14} />
+                        Browse
+                      </button>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Google Drive Source Selector for Compare */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      Google Drive Source *
+                    </label>
+                    <select
+                      className="select"
+                      value={selectedSourceId}
+                      onChange={(e) => {
+                        setSelectedSourceId(e.target.value);
+                        setResult(null);
+                        setError('');
+                      }}
+                      required
+                    >
+                      <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
+                      <optgroup label="Saved Pull Sources">
+                        {sources.filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL').map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                        ))}
+                      </optgroup>
+                      <optgroup label="Saved Push Sources">
+                        {sources.filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH').map((s: any) => (
+                          <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                        ))}
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  {/* Audio Folder GDrive Link */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      Audio Folder Link *
+                    </label>
+                    <input
+                      className="input"
+                      placeholder="Paste Google Drive Audio folder link..."
+                      value={audioFolderLink}
+                      onChange={(e) => {
+                        setAudioFolderLink(e.target.value);
+                        setResult(null);
+                      }}
+                      style={{ width: '100%', fontSize: '13px' }}
+                      required
+                    />
+                  </div>
+
+                  {/* Transcription Folder GDrive Link */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 500, color: 'var(--text-secondary)', marginBottom: '8px' }}>
+                      Transcription Folder Link *
+                    </label>
+                    <input
+                      className="input"
+                      placeholder="Paste Google Drive Transcription folder link..."
+                      value={transcriptFolderLink}
+                      onChange={(e) => {
+                        setTranscriptFolderLink(e.target.value);
+                        setResult(null);
+                      }}
+                      style={{ width: '100%', fontSize: '13px' }}
+                      required
+                    />
+                  </div>
+                </>
+              )}
 
               {/* Calculation Name / Label */}
               <div>
@@ -659,7 +826,16 @@ export default function AudioAnalyzerPage() {
               <button
                 type="submit"
                 className="btn-primary"
-                disabled={loading || (type === 'S3' && !selectedCustomerId) || (type === 'GDrive' && !selectedSourceId)}
+                disabled={
+                  loading ||
+                  (activeSubSection === 'single' && (
+                    (type === 'S3' && !selectedCustomerId) ||
+                    (type === 'GDrive' && !selectedSourceId)
+                  )) ||
+                  (activeSubSection === 'compare' && (
+                    !selectedSourceId || !audioFolderLink.trim() || !transcriptFolderLink.trim()
+                  ))
+                }
                 style={{ opacity: loading ? 0.7 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', padding: '12px', height: '42px', fontSize: '14px', width: '100%' }}
               >
                 {loading ? (
@@ -730,13 +906,21 @@ export default function AudioAnalyzerPage() {
                     
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center', fontSize: '11px', color: 'var(--text-tertiary)', marginTop: '2px' }}>
                       <span style={{ 
-                        background: item.storageType === 'S3' ? 'rgba(235,163,0,0.1)' : 'rgba(59,130,246,0.1)',
-                        color: item.storageType === 'S3' ? 'var(--accent-orange)' : 'var(--accent-blue)',
+                        background: item.storageType === 'S3' 
+                          ? 'rgba(235,163,0,0.1)' 
+                          : item.storageType === 'GDriveCompare'
+                            ? 'rgba(16,185,129,0.1)'
+                            : 'rgba(59,130,246,0.1)',
+                        color: item.storageType === 'S3' 
+                          ? 'var(--accent-orange)' 
+                          : item.storageType === 'GDriveCompare'
+                            ? '#10b981'
+                            : 'var(--accent-blue)',
                         padding: '1px 5px',
                         borderRadius: '4px',
                         fontWeight: 600,
                       }}>
-                        {item.storageType}
+                        {item.storageType === 'GDriveCompare' ? 'GDrive Match' : item.storageType}
                       </span>
                       {item.status === 'PENDING' && (
                         <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: 'var(--text-secondary)' }}>
@@ -758,7 +942,11 @@ export default function AudioAnalyzerPage() {
                       {(!item.status || item.status === 'COMPLETED') && (
                         <>
                           <span>{item.wavCount} files</span>
-                          <span>{formatDuration(item.totalDuration)}</span>
+                          <span>
+                            {item.storageType === 'GDriveCompare'
+                              ? formatDurationHMS(item.totalDuration)
+                              : formatDuration(item.totalDuration)}
+                          </span>
                         </>
                       )}
                     </div>
@@ -860,7 +1048,9 @@ export default function AudioAnalyzerPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     <span style={{ fontSize: '11px', color: 'var(--text-tertiary)', textTransform: 'uppercase', fontWeight: 600 }}>Total Playback Duration</span>
                     <span style={{ fontSize: '24px', fontWeight: 700, color: 'var(--accent-blue)' }}>
-                      {formatDuration(result.totalDuration)}
+                      {result.storageType === 'GDriveCompare'
+                        ? formatDurationHMS(result.totalDuration)
+                        : formatDuration(result.totalDuration)}
                     </span>
                   </div>
                   {result.totalDuration > 0 && <EqualizerAnimation />}
@@ -1143,10 +1333,14 @@ export default function AudioAnalyzerPage() {
             <div style={{ border: '1px solid #e2e8f0', borderTop: '4px solid #4f46e5', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#f8fafc' }}>
               <div style={{ fontSize: '10px', color: '#718096', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>WAV Playback Time</div>
               <div style={{ fontSize: '22px', fontWeight: 800, color: '#4f46e5', marginTop: '8px', letterSpacing: '-0.025em' }}>
-                {formatDuration(filteredTotalDuration)}
+                {result.storageType === 'GDriveCompare'
+                  ? formatDurationHMS(filteredTotalDuration)
+                  : formatDuration(filteredTotalDuration)}
               </div>
               <div style={{ fontSize: '11px', color: '#718096', marginTop: '4px' }}>
-                of {formatDuration(result.totalDuration)} overall
+                of {result.storageType === 'GDriveCompare'
+                  ? formatDurationHMS(result.totalDuration)
+                  : formatDuration(result.totalDuration)} overall
               </div>
             </div>
             <div style={{ border: '1px solid #e2e8f0', borderTop: '4px solid #0891b2', padding: '16px', borderRadius: '8px', textAlign: 'center', backgroundColor: '#f8fafc' }}>

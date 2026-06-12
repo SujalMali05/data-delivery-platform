@@ -273,6 +273,7 @@ export class CustomersService {
     path: string = '',
     page: number = 1,
     limit: number = 50,
+    sortDir: 'asc' | 'desc' = 'asc',
   ) {
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
@@ -337,12 +338,13 @@ export class CustomersService {
         };
       });
 
-      // Sort: Directories first, then files alphabetically
+      // Sort: Directories first, then files sorted by name (asc/desc) using natural numeric comparison
       mappedList.sort((a: any, b: any) => {
         if (a.isDir !== b.isDir) {
           return a.isDir ? -1 : 1;
         }
-        return a.name.localeCompare(b.name);
+        const cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
+        return sortDir === 'desc' ? -cmp : cmp;
       });
 
       const total = mappedList.length;

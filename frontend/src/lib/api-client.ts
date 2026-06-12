@@ -62,7 +62,7 @@ export const customersApi = {
     apiClient.post('/customers/browse', data),
   size: (data: { roleArn: string; bucketName: string; region: string; externalId?: string; path?: string }) =>
     apiClient.post('/customers/size', data),
-  listObjects: (data: { customerId: string; path?: string; page?: number; limit?: number }) =>
+  listObjects: (data: { customerId: string; path?: string; page?: number; limit?: number; sortDir?: 'asc' | 'desc' }) =>
     apiClient.post('/customers/list-objects', data),
   downloadObject: (customerId: string, path: string) =>
     apiClient.post('/customers/download-object', { customerId, path }, { responseType: 'blob' }),

@@ -3,6 +3,10 @@ import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
 import { RcloneService } from '../rclone/rclone.service';
 import { RcloneConfigService } from '../rclone/rclone-config.service';
+import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
+import axios from 'axios';
 
 @Injectable()
 export class GdriveService implements OnApplicationBootstrap {
@@ -23,14 +27,14 @@ export class GdriveService implements OnApplicationBootstrap {
       const healthy = await this.rcloneService.healthCheck();
       return {
         rcloneConnected: healthy,
-        serviceAccountConfigured: !!this.configService.get(
-          'GOOGLE_SERVICE_ACCOUNT_FILE',
+        oauthConfigured: !!this.configService.get(
+          'GOOGLE_OAUTH_TOKEN',
         ),
       };
     } catch {
       return {
         rcloneConnected: false,
-        serviceAccountConfigured: false,
+        oauthConfigured: false,
       };
     }
   }
@@ -39,17 +43,6 @@ export class GdriveService implements OnApplicationBootstrap {
     this.logger.log('Verifying global Google Drive sources...');
     try {
       await this.prisma.googleDriveSource.upsert({
-        where: { id: 'GLOBAL_SERVICE_ACCOUNT' },
-        update: {},
-        create: {
-          id: 'GLOBAL_SERVICE_ACCOUNT',
-          name: 'Global Service Account',
-          drivePath: '',
-          authType: 'SERVICE_ACCOUNT',
-        },
-      });
-
-      await this.prisma.googleDriveSource.upsert({
         where: { id: 'GLOBAL_OAUTH' },
         update: {},
         create: {
@@ -57,6 +50,7 @@ export class GdriveService implements OnApplicationBootstrap {
           name: 'Global User Account',
           drivePath: '',
           authType: 'OAUTH',
+          direction: 'PULL',
         },
       });
       this.logger.log('Global Google Drive sources verified.');
@@ -127,8 +121,9 @@ export class GdriveService implements OnApplicationBootstrap {
     driveType?: 'MY_DRIVE' | 'SHARED_DRIVE';
     sharedDriveId?: string;
     authType?: 'SERVICE_ACCOUNT' | 'OAUTH';
+    direction?: 'PUSH' | 'PULL';
   }) {
-    const authType = data.authType || 'SERVICE_ACCOUNT';
+    const authType = data.authType || 'OAUTH';
 
     // Auto-fill OAuth2 creds from env when authType is OAUTH
     let oauthCreds: {
@@ -147,6 +142,7 @@ export class GdriveService implements OnApplicationBootstrap {
         driveType: data.driveType || 'MY_DRIVE',
         sharedDriveId: data.sharedDriveId,
         authType,
+        direction: data.direction || 'PUSH',
         clientId: oauthCreds?.clientId,
         clientSecret: oauthCreds?.clientSecret,
         tokenJson: oauthCreds?.tokenJson,
@@ -306,8 +302,8 @@ export class GdriveService implements OnApplicationBootstrap {
       }
 
       let finalAuthType = source
-        ? source.authType || 'SERVICE_ACCOUNT'
-        : authType || 'SERVICE_ACCOUNT';
+        ? source.authType || 'OAUTH'
+        : authType || 'OAUTH';
       const finalSharedDriveId = source
         ? source.sharedDriveId || undefined
         : sharedDriveId || undefined;
@@ -504,5 +500,264 @@ export class GdriveService implements OnApplicationBootstrap {
         await this.rcloneConfig.cleanupRemotes(runJobId);
       }
     }
+  }
+
+  /**
+   * Compare audio and transcription Google Drive folders, find matches, and calculate duration.
+   */
+  async calculateWavDurationCompare(
+    audioFolderLink: string,
+    transcriptFolderLink: string,
+    sharedDriveId?: string,
+    authType?: 'SERVICE_ACCOUNT' | 'OAUTH',
+    onProgress?: (progress: {
+      scanned: number;
+      total: number;
+      currentFile: string;
+    }) => void,
+  ) {
+    const audioFolderId = this.extractFolderIdFromLink(audioFolderLink);
+    const transcriptFolderId = this.extractFolderIdFromLink(transcriptFolderLink);
+
+    if (!audioFolderId || !transcriptFolderId) {
+      throw new Error('Invalid Google Drive folder link(s) provided.');
+    }
+
+    const serviceAccountFile = this.configService.get<string>('GOOGLE_SERVICE_ACCOUNT_FILE') || '/config/rclone/service-account.json';
+
+    // Validate folder access before remote creation to prevent rclone silent fallback to root
+    if (onProgress) {
+      onProgress({ scanned: 0, total: 0, currentFile: 'Validating folder access...' });
+    }
+    await this.validateFolderAccess(audioFolderId, serviceAccountFile, authType);
+    await this.validateFolderAccess(transcriptFolderId, serviceAccountFile, authType);
+
+    const audioJobId = `compare-audio-${Date.now()}`;
+    const transcriptJobId = `compare-trans-${Date.now()}`;
+    let audioRemote = '';
+    let transcriptRemote = '';
+
+    try {
+      // Create remotes rooted at the respective folders
+      if (authType === 'OAUTH') {
+        const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+        audioRemote = await this.rcloneConfig.createGdriveRemote(audioJobId, {
+          authType: 'OAUTH',
+          clientId,
+          clientSecret,
+          tokenJson,
+          teamDriveId: sharedDriveId || undefined,
+          rootFolderId: audioFolderId,
+        });
+        transcriptRemote = await this.rcloneConfig.createGdriveRemote(transcriptJobId, {
+          authType: 'OAUTH',
+          clientId,
+          clientSecret,
+          tokenJson,
+          teamDriveId: sharedDriveId || undefined,
+          rootFolderId: transcriptFolderId,
+        });
+      } else {
+        if (!serviceAccountFile) {
+          throw new Error('Google Service Account key file is not configured on the platform');
+        }
+        audioRemote = await this.rcloneConfig.createGdriveRemote(audioJobId, {
+          serviceAccountFile,
+          teamDriveId: sharedDriveId || undefined,
+          rootFolderId: audioFolderId,
+        });
+        transcriptRemote = await this.rcloneConfig.createGdriveRemote(transcriptJobId, {
+          serviceAccountFile,
+          teamDriveId: sharedDriveId || undefined,
+          rootFolderId: transcriptFolderId,
+        });
+      }
+
+      // List files recursively from both
+      if (onProgress) {
+        onProgress({ scanned: 0, total: 0, currentFile: 'Listing transcription folder...' });
+      }
+      this.logger.log(`Listing transcription folder: ${transcriptRemote}:`);
+      const transListRes = await this.rcloneService.listDirectory(`${transcriptRemote}:`, '', { recurse: true });
+      const transItems = transListRes.list || [];
+
+      // Extract bases
+      const getBaseName = (pathOrName: string) => {
+        const lastDot = pathOrName.lastIndexOf('.');
+        const base = lastDot === -1 ? pathOrName : pathOrName.substring(0, lastDot);
+        return base.toLowerCase().trim();
+      };
+
+      const transPathsSet = new Set<string>();
+      const transNamesSet = new Set<string>();
+
+      for (const item of transItems) {
+        if (!item.IsDir) {
+          transPathsSet.add(getBaseName(item.Path));
+          transNamesSet.add(getBaseName(item.Name));
+        }
+      }
+
+      if (onProgress) {
+        onProgress({ scanned: 0, total: 0, currentFile: 'Listing audio folder (may take 2-3 minutes)...' });
+      }
+      this.logger.log(`Listing audio folder: ${audioRemote}:`);
+      const audioListRes = await this.rcloneService.listDirectory(`${audioRemote}:`, '', { recurse: true });
+      const audioItems = audioListRes.list || [];
+
+      // Filter audio files matching the transcription files
+      const matchedAudioFiles: any[] = [];
+      let skippedCount = 0;
+
+      for (const item of audioItems) {
+        if (item.IsDir) continue;
+        if (item.Name.toLowerCase().endsWith('.wav')) {
+          const pathBase = getBaseName(item.Path);
+          const nameBase = getBaseName(item.Name);
+          if (transPathsSet.has(pathBase) || transNamesSet.has(nameBase)) {
+            matchedAudioFiles.push(item);
+          } else {
+            skippedCount++;
+          }
+        } else {
+          skippedCount++;
+        }
+      }
+
+      this.logger.log(`Found ${matchedAudioFiles.length} matched WAV files to analyze out of ${audioItems.length} total objects`);
+
+      if (onProgress) {
+        onProgress({ scanned: 0, total: matchedAudioFiles.length, currentFile: `Found ${matchedAudioFiles.length} matched audios. Starting duration extraction...` });
+      }
+
+      // Run WAV duration calculations on matched files
+      return await this.rcloneService.calculateWavDurationForList(
+        `${audioRemote}:`,
+        matchedAudioFiles,
+        skippedCount,
+        onProgress
+      );
+
+    } catch (error: any) {
+      this.logger.error(
+        `Error performing Google Drive WAV duration compare scan: ${error.message}`,
+      );
+      throw new Error(`Failed to compare WAV folder duration: ${error.message}`);
+    } finally {
+      if (audioRemote) {
+        await this.rcloneConfig.cleanupRemotes(audioJobId);
+      }
+      if (transcriptRemote) {
+        await this.rcloneConfig.cleanupRemotes(transcriptJobId);
+      }
+    }
+  }
+
+  private async validateFolderAccess(
+    folderId: string,
+    serviceAccountFile: string,
+    authType?: 'SERVICE_ACCOUNT' | 'OAUTH',
+  ): Promise<void> {
+    try {
+      let accessToken = '';
+
+      if (authType === 'OAUTH') {
+        const { tokenJson } = this.getOAuthCredsFromEnv();
+        const parsed = JSON.parse(tokenJson);
+        accessToken = parsed.access_token;
+        if (!accessToken) {
+          throw new Error('OAuth access token not found in tokenJson.');
+        }
+      } else {
+        // Resolve container path to host path if running on host outside Docker
+        let hostSaPath = serviceAccountFile;
+        if (serviceAccountFile.startsWith('/config/rclone')) {
+          const hostConfigDir = path.resolve(process.cwd(), '../rclone-config');
+          hostSaPath = serviceAccountFile.replace('/config/rclone', hostConfigDir);
+        }
+
+        if (!fs.existsSync(hostSaPath)) {
+          throw new Error(`Service Account file not found at: ${hostSaPath} (resolved from ${serviceAccountFile})`);
+        }
+        const sa = JSON.parse(fs.readFileSync(hostSaPath, 'utf8'));
+
+        // ── Sign JWT ───────────────────────────────────────
+        const header = { alg: 'RS256', typ: 'JWT' };
+        const now = Math.floor(Date.now() / 1000);
+        const payload = {
+          iss: sa.client_email,
+          scope: 'https://www.googleapis.com/auth/drive.readonly',
+          aud: 'https://oauth2.googleapis.com/token',
+          exp: now + 3600,
+          iat: now,
+        };
+
+        const base64UrlEncode = (str: string) => {
+          return Buffer.from(str)
+            .toString('base64')
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        };
+
+        const encodedHeader = base64UrlEncode(JSON.stringify(header));
+        const encodedPayload = base64UrlEncode(JSON.stringify(payload));
+        const signatureInput = `${encodedHeader}.${encodedPayload}`;
+
+        const signer = crypto.createSign('RSA-SHA256');
+        signer.update(signatureInput);
+        const signature = signer.sign(sa.private_key, 'base64')
+          .replace(/=/g, '')
+          .replace(/\+/g, '-')
+          .replace(/\//g, '_');
+
+        const jwt = `${signatureInput}.${signature}`;
+
+        // ── Get Token ──────────────────────────────────────
+        const tokenResponse = await axios.post('https://oauth2.googleapis.com/token', {
+          grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+          assertion: jwt,
+        });
+        accessToken = tokenResponse.data.access_token;
+      }
+
+      // ── Verify Folder ──────────────────────────────────
+      const url = `https://www.googleapis.com/drive/v3/files/${folderId}?supportsAllDrives=true&fields=id,name,mimeType`;
+      await axios.get(url, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      });
+    } catch (error: any) {
+      const status = error.response?.status;
+      const details = error.response?.data?.error?.message || error.message;
+      this.logger.error(`Folder ID ${folderId} validation failed (status ${status}): ${details}`);
+      if (status === 404) {
+        throw new Error(`Google Drive folder ID "${folderId}" does not exist or is not found.`);
+      } else if (status === 403) {
+        throw new Error(`Access Denied: Google Drive folder ID "${folderId}" is not shared with the platform credentials.`);
+      } else {
+        throw new Error(`Failed to validate folder ID "${folderId}": ${details}`);
+      }
+    }
+  }
+
+  private extractFolderIdFromLink(link: string): string {
+    if (!link) return '';
+    const trimmed = link.trim();
+    const foldersRegex = /\/folders\/([a-zA-Z0-9_-]{5,100})/;
+    const foldersMatch = trimmed.match(foldersRegex);
+    if (foldersMatch) {
+      return foldersMatch[1];
+    }
+    const idParamRegex = /[?&]id=([a-zA-Z0-9_-]{5,100})/;
+    const idParamMatch = trimmed.match(idParamRegex);
+    if (idParamMatch) {
+      return idParamMatch[1];
+    }
+    if (/^[a-zA-Z0-9_-]{5,100}$/.test(trimmed)) {
+      return trimmed;
+    }
+    return '';
   }
 }

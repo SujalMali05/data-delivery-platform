@@ -149,6 +149,44 @@ body {
   animation: pulse-glow 2s ease-in-out infinite;
 }
 
+/* ── Cosmic Nebula / Floating Orb Animations ──────────────── */
+@keyframes float-orb-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(60px, 40px) scale(1.1); }
+}
+
+@keyframes float-orb-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  100% { transform: translate(-50px, -60px) scale(0.95); }
+}
+
+@keyframes float-orb-3 {
+  0% { transform: translate(0, 0) rotate(0deg); }
+  100% { transform: translate(-30px, 30px) rotate(180deg); }
+}
+
+@keyframes card-float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+
+.animate-float-orb-1 {
+  animation: float-orb-1 20s infinite alternate ease-in-out;
+}
+
+.animate-float-orb-2 {
+  animation: float-orb-2 18s infinite alternate ease-in-out;
+}
+
+.animate-float-orb-3 {
+  animation: float-orb-3 22s infinite alternate ease-in-out;
+}
+
+.animate-card-float {
+  animation: card-float 6s infinite ease-in-out;
+}
+
+
 /* ── Glass Effect ──────────────────── */
 .glass {
   background: var(--bg-glass);

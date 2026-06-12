@@ -102,8 +102,8 @@ export default function SizeCalculatorPage() {
   const selectedSource = selectedSourceId.startsWith('GLOBAL_')
     ? {
         id: selectedSourceId,
-        name: selectedSourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'Global Service Account' : 'Global User Account',
-        authType: selectedSourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'SERVICE_ACCOUNT' : 'OAUTH',
+        name: 'Global User Account',
+        authType: 'OAUTH',
         drivePath: '',
       }
     : sources.find((s: any) => s.id === selectedSourceId);
@@ -165,7 +165,7 @@ export default function SizeCalculatorPage() {
                   setPath('');
                   setResult(null);
                   setError('');
-                  setSelectedSourceId('GLOBAL_SERVICE_ACCOUNT');
+                  setSelectedSourceId('GLOBAL_OAUTH');
                 }}
                 style={{
                   padding: '10px',
@@ -222,19 +222,18 @@ export default function SizeCalculatorPage() {
                   }}
                   required
                 >
-                  <option value="GLOBAL_SERVICE_ACCOUNT">Global Service Account (Service Account)</option>
                   <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
-                  <optgroup label="Saved Pull Sources (OAuth2 Token)">
+                  <optgroup label="Saved Pull Sources">
                     {sources
-                      .filter((s: any) => s.authType === 'OAUTH')
+                      .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL')
                       .map((s: any) => (
                         <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
                       ))
                     }
                   </optgroup>
-                  <optgroup label="Saved Push Sources (Service Account)">
+                  <optgroup label="Saved Push Sources">
                     {sources
-                      .filter((s: any) => s.authType === 'SERVICE_ACCOUNT')
+                      .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH')
                       .map((s: any) => (
                         <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
                       ))

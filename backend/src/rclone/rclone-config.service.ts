@@ -53,7 +53,7 @@ export class RcloneConfigService {
       // ── Service Account auth (default) ──────────────────
       if (options.serviceAccountFile) {
         parameters['service_account_file'] = options.serviceAccountFile;
-        if (!options.teamDriveId && !process.env.GOOGLE_IMPERSONATE_USER) {
+        if (!options.teamDriveId && !options.rootFolderId && !process.env.GOOGLE_IMPERSONATE_USER) {
           parameters['shared_with_me'] = 'true';
         }
       }

@@ -40,6 +40,7 @@ export class GdriveController {
       driveType?: 'MY_DRIVE' | 'SHARED_DRIVE';
       sharedDriveId?: string;
       authType?: 'SERVICE_ACCOUNT' | 'OAUTH';
+      direction?: 'PUSH' | 'PULL';
     },
   ) {
     return this.gdriveService.createSource(body);

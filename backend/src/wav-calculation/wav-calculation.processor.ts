@@ -114,6 +114,16 @@ export class WavCalculationProcessor extends WorkerHost {
           params.authType || 'SERVICE_ACCOUNT',
           onProgress,
         );
+      } else if (record.storageType === 'GDriveCompare') {
+        const audioLink = (record.parameters as any)?.audioFolderLink || '';
+        const transcriptLink = (record.parameters as any)?.transcriptFolderLink || '';
+        result = await this.gdriveService.calculateWavDurationCompare(
+          audioLink,
+          transcriptLink,
+          params.sharedDriveId,
+          params.authType || 'SERVICE_ACCOUNT',
+          onProgress,
+        );
       } else if (record.storageType === 'S3') {
         if (!params.roleArn || !params.bucketName || !params.region) {
           throw new Error(

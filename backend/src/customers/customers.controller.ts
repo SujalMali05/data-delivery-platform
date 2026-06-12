@@ -98,6 +98,7 @@ export class CustomersController {
       path?: string;
       page?: number;
       limit?: number;
+      sortDir?: 'asc' | 'desc';
     },
   ) {
     return this.customersService.listObjects(
@@ -105,6 +106,7 @@ export class CustomersController {
       body.path || '',
       body.page || 1,
       body.limit || 50,
+      body.sortDir || 'asc',
     );
   }
 

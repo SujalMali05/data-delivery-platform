@@ -8,6 +8,7 @@ import {
   File,
   ChevronRight,
   ArrowUp,
+  ArrowDown,
   Search,
   Loader2,
   AlertTriangle,
@@ -45,6 +46,9 @@ export default function S3BrowserPage() {
   const [limit, setLimit] = useState<number>(50);
   const [filterText, setFilterText] = useState<string>('');
 
+  // Sorting state
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
   // Download tracking state
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
 
@@ -60,7 +64,7 @@ export default function S3BrowserPage() {
       });
   }, []);
 
-  // Fetch objects when customer, path, page, or limit changes
+  // Fetch objects when customer, path, page, limit, or sortDir changes
   useEffect(() => {
     if (!selectedCustomerId) {
       setItems([]);
@@ -68,7 +72,7 @@ export default function S3BrowserPage() {
       return;
     }
     fetchObjects();
-  }, [selectedCustomerId, path, page, limit]);
+  }, [selectedCustomerId, path, page, limit, sortDir]);
 
   const fetchObjects = async () => {
     setLoading(true);
@@ -79,6 +83,7 @@ export default function S3BrowserPage() {
         path,
         page,
         limit,
+        sortDir,
       });
       setItems(response.data.items || []);
       setTotal(response.data.total || 0);
@@ -115,6 +120,11 @@ export default function S3BrowserPage() {
   const handleFolderClick = (folderPath: string) => {
     setPath(folderPath);
     setPage(1); // Reset page to 1 on path change
+  };
+
+  const handleSortToggle = () => {
+    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    setPage(1); // Reset page to 1
   };
 
   const handleNavigateUp = () => {
@@ -313,7 +323,24 @@ export default function S3BrowserPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-secondary)', background: 'rgba(255,255,255,0.01)' }}>
-                    <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Name</th>
+                    <th 
+                      onClick={handleSortToggle}
+                      style={{ 
+                        padding: '12px 20px', 
+                        fontWeight: 600, 
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                      }}
+                      title={`Sort by Name ${sortDir === 'asc' ? 'Descending' : 'Ascending'}`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Name</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--accent-blue)', transition: 'transform 0.2s' }}>
+                          {sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                        </span>
+                      </div>
+                    </th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px' }}>Size</th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '200px' }}>Last Modified</th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px', textAlign: 'right' }}>Actions</th>

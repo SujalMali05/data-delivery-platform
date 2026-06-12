@@ -180,8 +180,8 @@ export default function ValidationPage() {
     if (formData.sourceId.startsWith('GLOBAL_')) {
       return {
         id: formData.sourceId,
-        name: formData.sourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'Global Service Account' : 'Global User Account',
-        authType: formData.sourceId === 'GLOBAL_SERVICE_ACCOUNT' ? 'SERVICE_ACCOUNT' : 'OAUTH',
+        name: 'Global User Account',
+        authType: 'OAUTH',
         drivePath: '',
       };
     }
@@ -294,19 +294,18 @@ export default function ValidationPage() {
                       required
                     >
                       <option value="">Select source connection...</option>
-                      <option value="GLOBAL_SERVICE_ACCOUNT">Global Service Account (Service Account)</option>
                       <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
-                      <optgroup label="Saved Pull Sources (OAuth2 Token)">
+                      <optgroup label="Saved Pull Sources">
                         {sources
-                          .filter((s: any) => s.authType === 'OAUTH')
+                          .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL')
                           .map((s: any) => (
                             <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
                           ))
                         }
                       </optgroup>
-                      <optgroup label="Saved Push Sources (Service Account)">
+                      <optgroup label="Saved Push Sources">
                         {sources
-                          .filter((s: any) => s.authType === 'SERVICE_ACCOUNT')
+                          .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH')
                           .map((s: any) => (
                             <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
                           ))
