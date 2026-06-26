@@ -75,7 +75,14 @@ export default function LoginPage() {
       <div className="login-orb login-orb-4" />
 
       {/* Subtle grid overlay for cyberpunk feel */}
-      <div className="login-grid-overlay" />
+      <div className="login-grid-overlay">
+        <div className="login-grid-node node-1" style={{ top: '20%', left: '30%' }} />
+        <div className="login-grid-node node-2" style={{ top: '45%', left: '68%' }} />
+        <div className="login-grid-node node-3" style={{ top: '70%', left: '22%' }} />
+        <div className="login-grid-node node-4" style={{ top: '82%', left: '58%' }} />
+        <div className="login-grid-node node-5" style={{ top: '15%', left: '88%' }} />
+        <div className="login-grid-node node-6" style={{ top: '60%', left: '12%' }} />
+      </div>
 
       {/* Theme toggle */}
       <button
@@ -269,6 +276,35 @@ export default function LoginPage() {
           background-image:
             linear-gradient(rgba(99, 102, 241, 0.03) 1px, transparent 1px),
             linear-gradient(90deg, rgba(99, 102, 241, 0.03) 1px, transparent 1px);
+        }
+
+        /* Star Map Node junctions */
+        .login-grid-node {
+          position: absolute;
+          width: 6px;
+          height: 6px;
+          border-radius: 50%;
+          pointer-events: none;
+          z-index: 2;
+        }
+        .theme-dark .login-grid-node {
+          background: #6366f1;
+          box-shadow: 0 0 6px #6366f1, 0 0 12px #6366f1;
+        }
+        .theme-light .login-grid-node {
+          background: #4f46e5;
+          box-shadow: 0 0 6px rgba(79, 70, 229, 0.4), 0 0 12px rgba(79, 70, 229, 0.2);
+        }
+        .node-1 { animation: twinkle-node 4s infinite ease-in-out; }
+        .node-2 { animation: twinkle-node 6s infinite ease-in-out 1s; }
+        .node-3 { animation: twinkle-node 5s infinite ease-in-out 2s; }
+        .node-4 { animation: twinkle-node 7s infinite ease-in-out 0.5s; }
+        .node-5 { animation: twinkle-node 4.5s infinite ease-in-out 3s; }
+        .node-6 { animation: twinkle-node 5.5s infinite ease-in-out 1.5s; }
+
+        @keyframes twinkle-node {
+          0%, 100% { opacity: 0.15; transform: scale(0.7); }
+          50% { opacity: 0.85; transform: scale(1.2); }
         }
 
         /* ── Nebula Orbs ───────────────────────────────── */
@@ -480,7 +516,7 @@ export default function LoginPage() {
           transform: translateY(20px) scale(0.98);
           transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
         }
-        .login-card-visible {
+        .login-card-wrapper.login-card-visible {
           opacity: 1;
           transform: translateY(0) scale(1);
         }
@@ -530,6 +566,7 @@ export default function LoginPage() {
           border-radius: 20px;
           transition: background 0.5s ease, border-color 0.5s ease, box-shadow 0.5s ease;
           width: 100%;
+          overflow: hidden; /* Restrict shimmer to card borders */
         }
         .theme-dark .login-card {
           background: rgba(8, 8, 20, 0.75);
@@ -550,6 +587,51 @@ export default function LoginPage() {
             0 25px 60px rgba(99, 102, 241, 0.05),
             inset 0 1px 0 rgba(255, 255, 255, 0.8),
             0 0 50px rgba(99, 102, 241, 0.02);
+        }
+
+        /* Premium light sweep reflection */
+        .login-card::after {
+          content: '';
+          position: absolute;
+          top: -150%;
+          left: -150%;
+          width: 300%;
+          height: 300%;
+          background: linear-gradient(
+            105deg,
+            transparent,
+            rgba(255, 255, 255, 0) 40%,
+            rgba(255, 255, 255, 0.08) 48%,
+            rgba(255, 255, 255, 0.20) 50%,
+            rgba(255, 255, 255, 0.08) 52%,
+            rgba(255, 255, 255, 0) 60%,
+            transparent
+          );
+          pointer-events: none;
+          z-index: 5;
+          animation: card-shimmer-sweep 12s infinite cubic-bezier(0.43, 0.13, 0.23, 0.96);
+        }
+
+        .theme-light .login-card::after {
+          background: linear-gradient(
+            105deg,
+            transparent,
+            rgba(255, 255, 255, 0) 40%,
+            rgba(255, 255, 255, 0.12) 47%,
+            rgba(255, 255, 255, 0.28) 50%,
+            rgba(255, 255, 255, 0.12) 53%,
+            rgba(255, 255, 255, 0) 60%,
+            transparent
+          );
+        }
+
+        @keyframes card-shimmer-sweep {
+          0% {
+            transform: translate(-30%, -30%);
+          }
+          100% {
+            transform: translate(30%, 30%);
+          }
         }
 
         /* ── Logo Section ──────────────────────────────── */
@@ -725,19 +807,26 @@ export default function LoginPage() {
         .login-input-glow {
           position: absolute;
           bottom: -1px;
-          left: 10%;
-          right: 10%;
+          left: 0;
+          right: 0;
           height: 2px;
           border-radius: 2px;
           opacity: 0;
-          transition: opacity 0.3s ease;
+          transform: scaleX(0);
+          transform-origin: left;
+          transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.2s ease;
           z-index: 2;
         }
         .theme-dark .login-input-glow {
-          background: linear-gradient(90deg, transparent, rgba(99,102,241,0.5), transparent);
+          background: linear-gradient(90deg, rgba(99,102,241,0.1) 0%, #6366f1 50%, rgba(99,102,241,0.1) 100%);
         }
         .theme-light .login-input-glow {
-          background: linear-gradient(90deg, transparent, rgba(79,70,229,0.5), transparent);
+          background: linear-gradient(90deg, rgba(79,70,229,0.1) 0%, #4f46e5 50%, rgba(79,70,229,0.1) 100%);
+        }
+        .login-input:focus + .login-eye-btn + .login-input-glow,
+        .login-input:focus + .login-input-glow {
+          opacity: 1;
+          transform: scaleX(1);
         }
 
         .login-eye-btn {

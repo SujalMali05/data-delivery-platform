@@ -165,19 +165,26 @@ export function getSavedThemeSettings(): ThemeSettings {
     return { mode: 'light', accent: 'indigo', vibrancy: 'vibrant' };
   }
 
-  const mode = (localStorage.getItem('ddp_theme') as ThemeMode) || 'light';
-  const accent = (localStorage.getItem('ddp_theme_accent') as AccentPreset) || 'indigo';
-  const vibrancy = (localStorage.getItem('ddp_theme_vibrancy') as VibrancyProfile) || 'vibrant';
-
-  return { mode, accent, vibrancy };
+  try {
+    const mode = (localStorage.getItem('ddp_theme') as ThemeMode) || 'light';
+    const accent = (localStorage.getItem('ddp_theme_accent') as AccentPreset) || 'indigo';
+    const vibrancy = (localStorage.getItem('ddp_theme_vibrancy') as VibrancyProfile) || 'vibrant';
+    return { mode, accent, vibrancy };
+  } catch (e) {
+    return { mode: 'light', accent: 'indigo', vibrancy: 'vibrant' };
+  }
 }
 
 export function saveThemeSettings(settings: ThemeSettings) {
   if (typeof window === 'undefined') return;
 
-  localStorage.setItem('ddp_theme', settings.mode);
-  localStorage.setItem('ddp_theme_accent', settings.accent);
-  localStorage.setItem('ddp_theme_vibrancy', settings.vibrancy);
+  try {
+    localStorage.setItem('ddp_theme', settings.mode);
+    localStorage.setItem('ddp_theme_accent', settings.accent);
+    localStorage.setItem('ddp_theme_vibrancy', settings.vibrancy);
+  } catch (e) {
+    // Ignore storage blocker errors
+  }
 
   applyThemeSettings(settings);
   window.dispatchEvent(new Event('ddp_theme_change'));

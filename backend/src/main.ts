@@ -19,7 +19,14 @@ async function bootstrap() {
 
   // CORS
   app.enableCors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+    origin: (origin: any, callback: any) => {
+      // In development, reflect request origin to allow any local network address (e.g. 192.168.1.57:3000)
+      if (!origin || process.env.NODE_ENV !== 'production' || origin === process.env.FRONTEND_URL) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 

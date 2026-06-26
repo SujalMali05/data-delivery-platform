@@ -236,7 +236,6 @@ export default function CosmicBackground({ text = 'DATABRIDGE' }: CosmicBackgrou
     const drawConnections = () => {
       if (!ctx) return;
       const maxDist = 90;
-      ctx.lineWidth = 0.4;
       for (let i = 0; i < starParticles.length; i++) {
         for (let j = i + 1; j < starParticles.length; j++) {
           const dx = starParticles[i].x - starParticles[j].x;
@@ -244,7 +243,36 @@ export default function CosmicBackground({ text = 'DATABRIDGE' }: CosmicBackgrou
           const dist = Math.sqrt(dx * dx + dy * dy);
           if (dist < maxDist) {
             const alpha = (1 - dist / maxDist) * 0.12;
-            ctx.strokeStyle = `rgba(99, 102, 241, ${alpha})`;
+
+            // Highlight connections near the mouse cursor
+            const midX = (starParticles[i].x + starParticles[j].x) / 2;
+            const midY = (starParticles[i].y + starParticles[j].y) / 2;
+            let nearMouse = false;
+            let mdist = 999;
+            if (mouse.x !== null && mouse.y !== null && mouse.active) {
+              const mdx = mouse.x - midX;
+              const mdy = mouse.y - midY;
+              mdist = Math.sqrt(mdx * mdx + mdy * mdy);
+              if (mdist < 150) {
+                nearMouse = true;
+              }
+            }
+
+            if (nearMouse) {
+              const glowFactor = (150 - mdist) / 150;
+              ctx.lineWidth = 0.4 + glowFactor * 0.6;
+              if (currentTheme === 'dark') {
+                // Gold / violet glow in dark mode
+                ctx.strokeStyle = `rgba(245, 158, 11, ${alpha * (1 + glowFactor * 2.5)})`;
+              } else {
+                // Deep royal indigo / gold glow in light mode
+                ctx.strokeStyle = `rgba(79, 70, 229, ${alpha * (1 + glowFactor * 3.0)})`;
+              }
+            } else {
+              ctx.lineWidth = 0.4;
+              ctx.strokeStyle = currentTheme === 'dark' ? `rgba(99, 102, 241, ${alpha})` : `rgba(79, 70, 229, ${alpha})`;
+            }
+
             ctx.globalAlpha = 1;
             ctx.beginPath();
             ctx.moveTo(starParticles[i].x, starParticles[i].y);

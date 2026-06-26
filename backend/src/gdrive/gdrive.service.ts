@@ -723,11 +723,39 @@ export class GdriveService implements OnApplicationBootstrap {
 
       // ── Verify Folder ──────────────────────────────────
       const url = `https://www.googleapis.com/drive/v3/files/${folderId}?supportsAllDrives=true&fields=id,name,mimeType`;
-      await axios.get(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
+      try {
+        await axios.get(url, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+        });
+      } catch (getErr: any) {
+        // If unauthorized (401), try to refresh token and retry if it's OAUTH
+        if (getErr.response?.status === 401 && authType === 'OAUTH') {
+          const { clientId, clientSecret, tokenJson } = this.getOAuthCredsFromEnv();
+          const parsed = JSON.parse(tokenJson);
+          if (parsed.refresh_token) {
+            this.logger.log(`OAuth access token for folder validation has expired. Refreshing token...`);
+            const refreshResponse = await axios.post('https://oauth2.googleapis.com/token', {
+              client_id: clientId,
+              client_secret: clientSecret,
+              refresh_token: parsed.refresh_token,
+              grant_type: 'refresh_token',
+            });
+            accessToken = refreshResponse.data.access_token;
+            this.logger.log('Retrying folder validation with fresh access token.');
+            await axios.get(url, {
+              headers: {
+                Authorization: `Bearer ${accessToken}`,
+              },
+            });
+          } else {
+            throw getErr;
+          }
+        } else {
+          throw getErr;
+        }
+      }
     } catch (error: any) {
       const status = error.response?.status;
       const details = error.response?.data?.error?.message || error.message;

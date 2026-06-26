@@ -96,10 +96,12 @@ export default function NewTransferPage() {
     }
   }, [form.customerId, customers]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent, modeOverride?: 'CREATE' | 'START' | 'QUEUE') => {
+    if (e) e.preventDefault();
     setError('');
     setLoading(true);
+
+    const mode = modeOverride || clickedMode;
 
     try {
       const formattedSelectedItems = selectedItems.map((item) =>
@@ -109,7 +111,7 @@ export default function NewTransferPage() {
         ...form,
         concurrency: form.concurrency === '' ? 6 : form.concurrency,
         retries: form.retries === '' ? 50 : form.retries,
-        launchMode: clickedMode,
+        launchMode: mode,
         bandwidthLimit: form.bandwidthLimit || undefined,
         skipDeletion: form.mode === 'SYNC' ? skipDeletion : false,
         dryRunReport: form.mode === 'SYNC' ? dryRunReport : undefined,
@@ -1044,7 +1046,10 @@ export default function NewTransferPage() {
                       <button
                         type="submit"
                         className="btn-primary"
-                        onClick={() => setClickedMode('START')}
+                        onClick={(e) => {
+                          setClickedMode('START');
+                          handleSubmit(e, 'START');
+                        }}
                         disabled={loading}
                         style={{ opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '10px' }}
                       >
@@ -1055,7 +1060,10 @@ export default function NewTransferPage() {
                       <button
                         type="submit"
                         className="btn-secondary"
-                        onClick={() => setClickedMode('QUEUE')}
+                        onClick={(e) => {
+                          setClickedMode('QUEUE');
+                          handleSubmit(e, 'QUEUE');
+                        }}
                         disabled={loading}
                         style={{ opacity: loading ? 0.6 : 1, border: '1px solid var(--accent-blue)', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '10px' }}
                       >
@@ -1066,7 +1074,10 @@ export default function NewTransferPage() {
                       <button
                         type="submit"
                         className="btn-secondary"
-                        onClick={() => setClickedMode('CREATE')}
+                        onClick={(e) => {
+                          setClickedMode('CREATE');
+                          handleSubmit(e, 'CREATE');
+                        }}
                         disabled={loading}
                         style={{ opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '10px' }}
                       >
@@ -1288,7 +1299,7 @@ export default function NewTransferPage() {
                   className="btn-primary"
                   onClick={(e) => {
                     setClickedMode('START');
-                    handleSubmit(e as any);
+                    handleSubmit(e, 'START');
                   }}
                   disabled={loading}
                   style={{ opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '10px' }}
@@ -1302,7 +1313,7 @@ export default function NewTransferPage() {
                   className="btn-secondary"
                   onClick={(e) => {
                     setClickedMode('QUEUE');
-                    handleSubmit(e as any);
+                    handleSubmit(e, 'QUEUE');
                   }}
                   disabled={loading}
                   style={{ opacity: loading ? 0.6 : 1, border: '1px solid var(--accent-blue)', color: 'var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '10px', background: 'transparent' }}
@@ -1316,7 +1327,7 @@ export default function NewTransferPage() {
                   className="btn-secondary"
                   onClick={(e) => {
                     setClickedMode('CREATE');
-                    handleSubmit(e as any);
+                    handleSubmit(e, 'CREATE');
                   }}
                   disabled={loading}
                   style={{ opacity: loading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 24px', borderRadius: '10px' }}

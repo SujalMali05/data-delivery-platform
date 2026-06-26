@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api';
+export const API_BASE_URL = typeof window !== 'undefined'
+  ? (process.env.NEXT_PUBLIC_API_URL || `http://${window.location.hostname}:4000/api`)
+  : (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:4000/api');
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
