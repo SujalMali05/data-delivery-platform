@@ -10,7 +10,7 @@ import {
   Res,
 } from '@nestjs/common';
 import { CustomersService } from './customers.service';
-import { CreateCustomerDto, UpdateCustomerDto } from './dto/customer.dto';
+import { CreateCustomerDto, UpdateCustomerDto, ListObjectsDto } from './dto/customer.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 
 @Controller('customers')
@@ -93,13 +93,7 @@ export class CustomersController {
   @Post('list-objects')
   listObjects(
     @Body()
-    body: {
-      customerId: string;
-      path?: string;
-      page?: number;
-      limit?: number;
-      sortDir?: 'asc' | 'desc';
-    },
+    body: ListObjectsDto,
   ) {
     return this.customersService.listObjects(
       body.customerId,
@@ -107,6 +101,9 @@ export class CustomersController {
       body.page || 1,
       body.limit || 50,
       body.sortDir || 'asc',
+      body.startDate,
+      body.endDate,
+      body.sortBy || 'name',
     );
   }
 

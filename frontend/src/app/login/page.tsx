@@ -62,7 +62,7 @@ export default function LoginPage() {
   const isDark = theme === 'dark';
 
   return (
-    <div className={`login-cosmic-root ${isDark ? 'theme-dark' : 'theme-light'}`}>
+    <div className={`login-cosmic-root ${mounted && theme === 'light' ? 'theme-light' : 'theme-dark'}`}>
       {/* ═══ Full-Screen Cosmic Background ═══ */}
       <div className="login-canvas-container">
         <CosmicBackground text="DATABRIDGE" />
@@ -101,7 +101,7 @@ export default function LoginPage() {
 
         {/* Right Side: Form Panel */}
         <div className="login-right-panel">
-          <div className={`login-card-wrapper ${mounted ? 'login-card-visible' : ''}`}>
+          <div className="login-card-wrapper">
             {/* Animated gradient border glow */}
             <div className="login-card-glow" />
 
@@ -512,13 +512,17 @@ export default function LoginPage() {
           position: relative;
           width: 100%;
           max-width: 410px;
-          opacity: 0;
-          transform: translateY(20px) scale(0.98);
-          transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+          animation: login-card-fade-in 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
-        .login-card-wrapper.login-card-visible {
-          opacity: 1;
-          transform: translateY(0) scale(1);
+        @keyframes login-card-fade-in {
+          from {
+            opacity: 0;
+            transform: translateY(20px) scale(0.98);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+          }
         }
 
         /* ── Animated Gradient Border Glow ─────────────── */

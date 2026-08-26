@@ -825,4 +825,38 @@ export class RcloneService {
       onProgress,
     );
   }
+
+  /**
+   * Delete a single file on a remote path
+   */
+  async deleteFile(fs: string, remote: string): Promise<void> {
+    try {
+      await this.client.post('/operations/deletefile', {
+        fs,
+        remote,
+      });
+      this.logger.log(`Deleted file: ${remote} on ${fs}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to delete file ${remote} on ${fs}: ${error.message}`);
+      throw new Error(`rclone deletefile failed: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  /**
+   * Copy a single file from source fs to destination fs
+   */
+  async copyFile(srcFs: string, srcRemote: string, dstFs: string, dstRemote: string): Promise<void> {
+    try {
+      await this.client.post('/operations/copyfile', {
+        srcFs,
+        srcRemote,
+        dstFs,
+        dstRemote,
+      });
+      this.logger.log(`Copied file: ${srcRemote} from ${srcFs} to ${dstRemote} on ${dstFs}`);
+    } catch (error: any) {
+      this.logger.error(`Failed to copy file ${srcRemote} from ${srcFs} to ${dstRemote} on ${dstFs}: ${error.message}`);
+      throw new Error(`rclone copyfile failed: ${error.response?.data?.error || error.message}`);
+    }
+  }
 }

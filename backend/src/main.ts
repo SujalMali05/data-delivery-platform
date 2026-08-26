@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe, Logger } from '@nestjs/common';
+import { json, urlencoded } from 'express';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 
@@ -13,6 +14,10 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
     logger: ['log', 'error', 'warn', 'debug', 'verbose'],
   });
+
+  // Increase body parser limits for high-volume batch operations (e.g. 10,000+ CSV or sync items)
+  app.use(json({ limit: '50mb' }));
+  app.use(urlencoded({ limit: '50mb', extended: true }));
 
   // Global prefix
   app.setGlobalPrefix('api');
@@ -46,7 +51,7 @@ async function bootstrap() {
   app.useGlobalFilters(new GlobalExceptionFilter());
 
   const port = process.env.PORT || 4000;
-  await app.listen(port);
+  await app.listen(port, '0.0.0.0');
   logger.log(`🚀 Data Delivery Platform API running on port ${port}`);
   logger.log(`📋 Environment: ${process.env.NODE_ENV || 'development'}`);
 }

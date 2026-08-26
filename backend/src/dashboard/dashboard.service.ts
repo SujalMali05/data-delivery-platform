@@ -19,14 +19,16 @@ export class DashboardService {
       totalTransferred,
       recentTransfers,
     ] = await Promise.all([
-      this.prisma.transfer.count({ where: { status: 'RUNNING' } }),
-      this.prisma.transfer.count({ where: { status: 'QUEUED' } }),
-      this.prisma.transfer.count({ where: { status: 'FAILED' } }),
-      this.prisma.transfer.count({ where: { status: 'COMPLETED' } }),
+      this.prisma.transfer.count({ where: { status: 'RUNNING', isBatch: false } }),
+      this.prisma.transfer.count({ where: { status: 'QUEUED', isBatch: false } }),
+      this.prisma.transfer.count({ where: { status: 'FAILED', isBatch: false } }),
+      this.prisma.transfer.count({ where: { status: 'COMPLETED', isBatch: false } }),
       this.prisma.transfer.aggregate({
+        where: { isBatch: false },
         _sum: { transferredBytes: true },
       }),
       this.prisma.transfer.findMany({
+        where: { isBatch: false },
         take: 10,
         orderBy: { updatedAt: 'desc' },
         select: {

@@ -274,7 +274,11 @@ export class CustomersService {
     page: number = 1,
     limit: number = 50,
     sortDir: 'asc' | 'desc' = 'asc',
+    startDate?: string,
+    endDate?: string,
+    sortBy: 'name' | 'date' = 'name',
   ) {
+    this.logger.log(`[listObjects] customerId=${customerId} path=${path} page=${page} limit=${limit} sortDir=${sortDir} startDate=${startDate} endDate=${endDate} sortBy=${sortBy}`);
     const customer = await this.prisma.customer.findUnique({
       where: { id: customerId },
     });
@@ -338,19 +342,48 @@ export class CustomersService {
         };
       });
 
-      // Sort: Directories first, then files sorted by name (asc/desc) using natural numeric comparison
-      mappedList.sort((a: any, b: any) => {
+      // Filter by date range if provided (excluding directories, which are always kept)
+      let filteredList = mappedList;
+      if (startDate || endDate) {
+        filteredList = mappedList.filter((item: any) => {
+          if (item.isDir) return true;
+          if (!item.modTime) return false;
+
+          const itemDate = new Date(item.modTime);
+          if (startDate) {
+            const start = new Date(startDate);
+            start.setHours(0, 0, 0, 0);
+            if (itemDate < start) return false;
+          }
+          if (endDate) {
+            const end = new Date(endDate);
+            end.setHours(23, 59, 59, 999);
+            if (itemDate > end) return false;
+          }
+          return true;
+        });
+      }
+
+      // Sort: Directories first, then files sorted by date/time or name (asc/desc)
+      filteredList.sort((a: any, b: any) => {
         if (a.isDir !== b.isDir) {
           return a.isDir ? -1 : 1;
+        }
+        if (sortBy === 'date') {
+          const timeA = a.modTime ? new Date(a.modTime).getTime() : 0;
+          const timeB = b.modTime ? new Date(b.modTime).getTime() : 0;
+          if (timeA !== timeB) {
+            return sortDir === 'desc' ? timeB - timeA : timeA - timeB;
+          }
         }
         const cmp = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
         return sortDir === 'desc' ? -cmp : cmp;
       });
 
-      const total = mappedList.length;
+      const total = filteredList.length;
       const startIndex = (page - 1) * limit;
       const endIndex = page * limit;
-      const items = mappedList.slice(startIndex, endIndex);
+      const items = filteredList.slice(startIndex, endIndex);
 
       return {
         items,

@@ -7,7 +7,7 @@ services:
     container_name: ddp-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "5433:5432"
     environment:
       POSTGRES_USER: ddp_user
       POSTGRES_PASSWORD: ddp_secret_2024

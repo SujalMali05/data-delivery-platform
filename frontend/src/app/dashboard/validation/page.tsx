@@ -27,9 +27,12 @@ interface ValidationItem {
   name: string;
   status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
   oneWay: boolean;
+  ignoreExtension: boolean;
+  sourceType: string;
   sourceId: string;
   sourcePath: string;
-  customerId: string;
+  destType: string;
+  destId: string;
   destinationPath: string;
   srcTotalBytes: string;
   srcTotalFiles: number;
@@ -42,8 +45,10 @@ interface ValidationItem {
   errorCount: number;
   errorMessage?: string;
   createdAt: string;
-  source: { name: string; drivePath: string };
-  customer: { name: string; bucketName: string };
+  sourceGDrive?: { name: string; drivePath: string } | null;
+  sourceCustomer?: { name: string; bucketName: string } | null;
+  destGDrive?: { name: string; drivePath: string } | null;
+  destCustomer?: { name: string; bucketName: string } | null;
 }
 
 export default function ValidationPage() {
@@ -57,16 +62,19 @@ export default function ValidationPage() {
   // Form State
   const [formData, setFormData] = useState({
     name: '',
+    sourceType: 'GDrive', // 'GDrive' | 'S3'
     sourceId: '',
     sourcePath: '',
-    customerId: '',
+    destType: 'S3', // 'GDrive' | 'S3'
+    destId: '',
     destinationPath: '',
     oneWay: false,
+    ignoreExtension: false,
   });
 
   // Folder Browser Modal State
   const [isBrowserOpen, setIsBrowserOpen] = useState(false);
-  const [browserTarget, setBrowserTarget] = useState<'gdrive' | 's3'>('gdrive');
+  const [browserTarget, setBrowserTarget] = useState<'source' | 'dest'>('source');
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -85,17 +93,17 @@ export default function ValidationPage() {
     return () => clearInterval(interval);
   }, [validations]);
 
-  // Auto-fill destinationPath when customer changes
+  // Auto-fill destinationPath when destId changes and destType is S3
   useEffect(() => {
-    if (formData.customerId) {
-      const customer = customers.find((c: any) => c.id === formData.customerId);
+    if (formData.destType === 'S3' && formData.destId) {
+      const customer = customers.find((c: any) => c.id === formData.destId);
       if (customer?.prefixPath) {
         setFormData((prev) => ({ ...prev, destinationPath: customer.prefixPath }));
       } else {
         setFormData((prev) => ({ ...prev, destinationPath: '' }));
       }
     }
-  }, [formData.customerId, customers]);
+  }, [formData.destId, formData.destType, customers]);
 
   const fetchValidations = async (showLoading = false) => {
     if (showLoading) setLoading(true);
@@ -125,7 +133,7 @@ export default function ValidationPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name || !formData.sourceId || !formData.customerId) {
+    if (!formData.name || !formData.sourceId || !formData.destId) {
       alert('Please fill out all required fields.');
       return;
     }
@@ -136,11 +144,14 @@ export default function ValidationPage() {
       await validationApi.create(formData);
       setFormData({
         name: '',
+        sourceType: 'GDrive',
         sourceId: '',
         sourcePath: '',
-        customerId: '',
+        destType: 'S3',
+        destId: '',
         destinationPath: '',
         oneWay: false,
+        ignoreExtension: false,
       });
       setShowForm(false);
       fetchValidations();
@@ -163,13 +174,12 @@ export default function ValidationPage() {
     }
   };
 
-  const openBrowser = (target: 'gdrive' | 's3') => {
-    if (target === 'gdrive' && !formData.sourceId) {
-      alert('Please select a Google Drive source first.');
-      return;
-    }
-    if (target === 's3' && !formData.customerId) {
-      alert('Please select a Customer S3 configuration first.');
+  const openBrowser = (target: 'source' | 'dest') => {
+    const isSource = target === 'source';
+    const type = isSource ? formData.sourceType : formData.destType;
+    const id = isSource ? formData.sourceId : formData.destId;
+    if (!id) {
+      alert(`Please select a ${type === 'GDrive' ? 'Google Drive' : 'Customer S3'} connection first.`);
       return;
     }
     setBrowserTarget(target);
@@ -177,19 +187,21 @@ export default function ValidationPage() {
   };
 
   const getSelectedSource = () => {
-    if (formData.sourceId.startsWith('GLOBAL_')) {
+    const activeId = browserTarget === 'source' ? formData.sourceId : formData.destId;
+    if (activeId.startsWith('GLOBAL_')) {
       return {
-        id: formData.sourceId,
+        id: activeId,
         name: 'Global User Account',
         authType: 'OAUTH',
         drivePath: '',
       };
     }
-    return sources.find((s) => s.id === formData.sourceId);
+    return sources.find((s) => s.id === activeId);
   };
 
   const getSelectedCustomer = () => {
-    return customers.find((c) => c.id === formData.customerId);
+    const activeId = browserTarget === 'source' ? formData.sourceId : formData.destId;
+    return customers.find((c) => c.id === activeId);
   };
 
   const formatBytes = (bytesStr: string) => {
@@ -232,6 +244,10 @@ export default function ValidationPage() {
     }
   };
 
+  const browserType = browserTarget === 'source'
+    ? (formData.sourceType === 'GDrive' ? 'gdrive' : 's3')
+    : (formData.destType === 'GDrive' ? 'gdrive' : 's3');
+
   return (
     <div className="animate-fadeIn" style={{ display: 'flex', flexDirection: 'column', gap: '20px', minHeight: 'calc(100vh - 120px)' }}>
       {/* Header */}
@@ -242,7 +258,7 @@ export default function ValidationPage() {
             Folder Validation & Difference Reports
           </h1>
           <p style={{ fontSize: '14px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-            Integrity checks, file matching, and validation reports between Google Drive and S3
+            Integrity checks, file matching, and validation reports between Google Drive and Amazon S3
           </p>
         </div>
         <button className="btn-primary" onClick={() => setShowForm(!showForm)}>
@@ -276,43 +292,80 @@ export default function ValidationPage() {
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-              {/* Google Drive Configuration */}
+              {/* Source Configuration */}
               <div className="card" style={{ padding: '16px', border: '1px solid var(--border-secondary)', background: 'rgba(255,255,255,0.01)' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <HardDrive size={16} color="var(--accent-blue)" />
-                  Google Drive (Source)
+                  {formData.sourceType === 'GDrive' ? <HardDrive size={16} color="var(--accent-blue)" /> : <Database size={16} color="var(--accent-blue)" />}
+                  Source Connection
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Select GDrive Source *</label>
-                    <select
-                      className="select"
-                      value={formData.sourceId}
-                      onChange={(e) => {
-                        setFormData({ ...formData, sourceId: e.target.value, sourcePath: '' });
-                      }}
-                      required
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className={`btn-secondary`}
+                      onClick={() => setFormData({ ...formData, sourceType: 'GDrive', sourceId: '', sourcePath: '' })}
+                      style={{ flex: 1, border: formData.sourceType === 'GDrive' ? '2px solid var(--accent-blue)' : '1px solid var(--border-secondary)', background: formData.sourceType === 'GDrive' ? 'rgba(59,130,246,0.05)' : 'transparent' }}
                     >
-                      <option value="">Select source connection...</option>
-                      <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
-                      <optgroup label="Saved Pull Sources">
-                        {sources
-                          .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL')
-                          .map((s: any) => (
-                            <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
-                          ))
-                        }
-                      </optgroup>
-                      <optgroup label="Saved Push Sources">
-                        {sources
-                          .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH')
-                          .map((s: any) => (
-                            <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
-                          ))
-                        }
-                      </optgroup>
-                    </select>
+                      Google Drive
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-secondary`}
+                      onClick={() => setFormData({ ...formData, sourceType: 'S3', sourceId: '', sourcePath: '' })}
+                      style={{ flex: 1, border: formData.sourceType === 'S3' ? '2px solid var(--accent-blue)' : '1px solid var(--border-secondary)', background: formData.sourceType === 'S3' ? 'rgba(59,130,246,0.05)' : 'transparent' }}
+                    >
+                      Amazon S3
+                    </button>
                   </div>
+
+                  {formData.sourceType === 'GDrive' ? (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Select GDrive Source *</label>
+                      <select
+                        className="select"
+                        value={formData.sourceId}
+                        onChange={(e) => setFormData({ ...formData, sourceId: e.target.value, sourcePath: '' })}
+                        required
+                      >
+                        <option value="">Select source connection...</option>
+                        <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
+                        <optgroup label="Saved Pull Sources">
+                          {sources
+                            .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL')
+                            .map((s: any) => (
+                              <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                            ))
+                          }
+                        </optgroup>
+                        <optgroup label="Saved Push Sources">
+                          {sources
+                            .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH')
+                            .map((s: any) => (
+                              <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                            ))
+                          }
+                        </optgroup>
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Select Customer S3 *</label>
+                      <select
+                        className="select"
+                        value={formData.sourceId}
+                        onChange={(e) => setFormData({ ...formData, sourceId: e.target.value, sourcePath: '' })}
+                        required
+                      >
+                        <option value="">Select customer bucket...</option>
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.bucketName})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Folder Sub-Path (Optional)</label>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -325,7 +378,7 @@ export default function ValidationPage() {
                       <button
                         type="button"
                         className="btn-secondary"
-                        onClick={() => openBrowser('gdrive')}
+                        onClick={() => openBrowser('source')}
                         disabled={!formData.sourceId}
                         style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
@@ -333,33 +386,83 @@ export default function ValidationPage() {
                       </button>
                     </div>
                   </div>
-
                 </div>
               </div>
 
-              {/* S3 Configuration */}
+              {/* Destination Configuration */}
               <div className="card" style={{ padding: '16px', border: '1px solid var(--border-secondary)', background: 'rgba(255,255,255,0.01)' }}>
                 <h4 style={{ fontSize: '14px', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
-                  <Database size={16} color="var(--accent-blue)" />
-                  Amazon S3 (Destination)
+                  {formData.destType === 'GDrive' ? <HardDrive size={16} color="var(--accent-blue)" /> : <Database size={16} color="var(--accent-blue)" />}
+                  Destination Connection
                 </h4>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Select Customer S3 *</label>
-                    <select
-                      className="select"
-                      value={formData.customerId}
-                      onChange={(e) => setFormData({ ...formData, customerId: e.target.value, destinationPath: '' })}
-                      required
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button
+                      type="button"
+                      className={`btn-secondary`}
+                      onClick={() => setFormData({ ...formData, destType: 'GDrive', destId: '', destinationPath: '' })}
+                      style={{ flex: 1, border: formData.destType === 'GDrive' ? '2px solid var(--accent-blue)' : '1px solid var(--border-secondary)', background: formData.destType === 'GDrive' ? 'rgba(59,130,246,0.05)' : 'transparent' }}
                     >
-                      <option value="">Select customer bucket...</option>
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.bucketName})
-                        </option>
-                      ))}
-                    </select>
+                      Google Drive
+                    </button>
+                    <button
+                      type="button"
+                      className={`btn-secondary`}
+                      onClick={() => setFormData({ ...formData, destType: 'S3', destId: '', destinationPath: '' })}
+                      style={{ flex: 1, border: formData.destType === 'S3' ? '2px solid var(--accent-blue)' : '1px solid var(--border-secondary)', background: formData.destType === 'S3' ? 'rgba(59,130,246,0.05)' : 'transparent' }}
+                    >
+                      Amazon S3
+                    </button>
                   </div>
+
+                  {formData.destType === 'GDrive' ? (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Select GDrive Destination *</label>
+                      <select
+                        className="select"
+                        value={formData.destId}
+                        onChange={(e) => setFormData({ ...formData, destId: e.target.value, destinationPath: '' })}
+                        required
+                      >
+                        <option value="">Select destination connection...</option>
+                        <option value="GLOBAL_OAUTH">Global User Account (OAuth2 Token)</option>
+                        <optgroup label="Saved Pull Sources">
+                          {sources
+                            .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PULL')
+                            .map((s: any) => (
+                              <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                            ))
+                          }
+                        </optgroup>
+                        <optgroup label="Saved Push Sources">
+                          {sources
+                            .filter((s: any) => (s.direction || (s.authType === 'OAUTH' ? 'PULL' : 'PUSH')) === 'PUSH')
+                            .map((s: any) => (
+                              <option key={s.id} value={s.id}>{s.name} ({s.drivePath})</option>
+                            ))
+                          }
+                        </optgroup>
+                      </select>
+                    </div>
+                  ) : (
+                    <div>
+                      <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Select Customer S3 *</label>
+                      <select
+                        className="select"
+                        value={formData.destId}
+                        onChange={(e) => setFormData({ ...formData, destId: e.target.value, destinationPath: '' })}
+                        required
+                      >
+                        <option value="">Select customer bucket...</option>
+                        {customers.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.name} ({c.bucketName})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
                   <div>
                     <label style={{ display: 'block', fontSize: '12px', color: 'var(--text-tertiary)', marginBottom: '4px' }}>Prefix Sub-Path (Optional)</label>
                     <div style={{ display: 'flex', gap: '8px' }}>
@@ -372,8 +475,8 @@ export default function ValidationPage() {
                       <button
                         type="button"
                         className="btn-secondary"
-                        onClick={() => openBrowser('s3')}
-                        disabled={!formData.customerId}
+                        onClick={() => openBrowser('dest')}
+                        disabled={!formData.destId}
                         style={{ display: 'flex', alignItems: 'center', gap: '4px' }}
                       >
                         <FolderOpen size={14} /> Browse
@@ -384,17 +487,32 @@ export default function ValidationPage() {
               </div>
             </div>
 
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <input
-                type="checkbox"
-                id="oneWay"
-                checked={formData.oneWay}
-                onChange={(e) => setFormData({ ...formData, oneWay: e.target.checked })}
-                style={{ cursor: 'pointer' }}
-              />
-              <label htmlFor="oneWay" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
-                <strong>One-Way Validation Check</strong> (Verify that all files in Google Drive are correctly present on S3. Ignore extra objects on S3.)
-              </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '4px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="oneWay"
+                  checked={formData.oneWay}
+                  onChange={(e) => setFormData({ ...formData, oneWay: e.target.checked })}
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="oneWay" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+                  <strong>One-Way Validation Check</strong> (Verify that all files in Source are correctly present on Destination. Ignore extra objects on Destination.)
+                </label>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <input
+                  type="checkbox"
+                  id="ignoreExtension"
+                  checked={formData.ignoreExtension}
+                  onChange={(e) => setFormData({ ...formData, ignoreExtension: e.target.checked })}
+                  style={{ cursor: 'pointer' }}
+                />
+                <label htmlFor="ignoreExtension" style={{ fontSize: '13px', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+                  <strong>Ignore File Extensions</strong> (Compare base filenames only, ignoring extensions like .json, .wav, etc.)
+                </label>
+              </div>
             </div>
 
             <div style={{ display: 'flex', gap: '12px', borderTop: '1px solid var(--border-secondary)', paddingTop: '16px', marginTop: '4px' }}>
@@ -445,7 +563,7 @@ export default function ValidationPage() {
                 <tr style={{ borderBottom: '1px solid var(--border-secondary)', background: 'rgba(255,255,255,0.01)', textAlign: 'left' }}>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Run Name</th>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Folders Path Mapping</th>
-                  <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Sizing (Drive ➔ S3)</th>
+                  <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Sizing (Src ➔ Dst)</th>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)' }}>Audit Results (Differ / Missing)</th>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '130px' }}>Status</th>
                   <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '160px' }}>Execution Date</th>
@@ -455,8 +573,12 @@ export default function ValidationPage() {
               <tbody>
                 {validations.map((v) => {
                   const hasStats = v.status === 'COMPLETED';
-                  const pathGoogle = `${v.source?.name}:${v.sourcePath || '/'}`;
-                  const pathS3 = `${v.customer?.name}:${v.destinationPath || '/'}`;
+
+                  const sourceName = v.sourceType === 'GDrive' ? (v.sourceGDrive?.name || 'Drive') : (v.sourceCustomer?.name || 'S3');
+                  const destName = v.destType === 'GDrive' ? (v.destGDrive?.name || 'Drive') : (v.destCustomer?.name || 'S3');
+
+                  const pathSource = `${sourceName}:${v.sourcePath || '/'}`;
+                  const pathDest = `${destName}:${v.destinationPath || '/'}`;
 
                   return (
                     <tr key={v.id} style={{ borderBottom: '1px solid var(--border-secondary)' }}>
@@ -464,23 +586,24 @@ export default function ValidationPage() {
                         <div>{v.name}</div>
                         <span style={{ fontSize: '11px', color: 'var(--text-tertiary)' }}>
                           {v.oneWay ? 'One-Way Audit' : 'Two-Way Full Audit'}
+                          {v.ignoreExtension ? ' (No Ext)' : ''}
                         </span>
                       </td>
                       <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', maxWidth: '300px' }}>
-                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '12px' }} title={pathGoogle}>
-                            🟢 {pathGoogle}
+                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '12px' }} title={pathSource}>
+                            🟢 {pathSource}
                           </span>
-                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '12px' }} title={pathS3}>
-                            🔵 {pathS3}
+                          <span style={{ textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', fontSize: '12px' }} title={pathDest}>
+                            🔵 {pathDest}
                           </span>
                         </div>
                       </td>
                       <td style={{ padding: '14px 20px', color: 'var(--text-secondary)' }}>
                         {hasStats ? (
                           <div style={{ display: 'flex', flexDirection: 'column', fontSize: '11px', gap: '2px' }}>
-                            <span>GDrive: {v.srcTotalFiles} ({formatBytes(v.srcTotalBytes)})</span>
-                            <span>S3: {v.dstTotalFiles} ({formatBytes(v.dstTotalBytes)})</span>
+                            <span>Src: {v.srcTotalFiles} ({formatBytes(v.srcTotalBytes)})</span>
+                            <span>Dst: {v.dstTotalFiles} ({formatBytes(v.dstTotalBytes)})</span>
                           </div>
                         ) : (
                           <span style={{ color: 'var(--text-muted)' }}>—</span>
@@ -493,10 +616,10 @@ export default function ValidationPage() {
                               <span style={{ color: 'var(--accent-amber)', fontWeight: 600 }}>{v.differCount} diff</span>
                             ) : null}
                             {v.missingDstCount > 0 ? (
-                              <span style={{ color: 'var(--accent-purple)', fontWeight: 600 }}>{v.missingDstCount} unique in Drive</span>
+                              <span style={{ color: 'var(--accent-purple)', fontWeight: 600 }}>{v.missingDstCount} unique in Source</span>
                             ) : null}
                             {!v.oneWay && v.missingSrcCount > 0 ? (
-                              <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{v.missingSrcCount} unique in S3</span>
+                              <span style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}>{v.missingSrcCount} unique in Destination</span>
                             ) : null}
                             {v.differCount === 0 && v.missingDstCount === 0 && (v.oneWay || v.missingSrcCount === 0) && v.srcTotalFiles === v.dstTotalFiles && Number(v.srcTotalBytes) === Number(v.dstTotalBytes) ? (
                               <span style={{ color: 'var(--accent-emerald)', fontWeight: 600 }}>✅ 100% In Sync</span>
@@ -520,31 +643,31 @@ export default function ValidationPage() {
                       </td>
                       <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px' }}>
-                            <Link 
-                              href={`/dashboard/validation/${v.id}`} 
-                              className="btn-secondary" 
-                              style={{ 
-                                padding: '6px 12px', 
-                                display: 'inline-flex', 
-                                alignItems: 'center', 
-                                gap: '6px', 
-                                border: '1px solid var(--accent-blue)', 
-                                color: 'var(--accent-blue)',
-                                whiteSpace: 'nowrap',
-                                fontSize: '12px',
-                                textDecoration: 'none'
-                              }}
-                            >
-                              <Eye size={13} /> {v.status === 'COMPLETED' ? 'View Report' : ['PENDING', 'RUNNING'].includes(v.status) ? 'Checking...' : 'View Details'}
-                            </Link>
-                          <button 
-                            className="btn-danger" 
-                            style={{ 
-                              padding: '6px 8px', 
-                              display: 'inline-flex', 
-                              alignItems: 'center', 
-                              justifyContent: 'center' 
-                            }} 
+                          <Link
+                            href={`/dashboard/validation/${v.id}`}
+                            className="btn-secondary"
+                            style={{
+                              padding: '6px 12px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              border: '1px solid var(--accent-blue)',
+                              color: 'var(--accent-blue)',
+                              whiteSpace: 'nowrap',
+                              fontSize: '12px',
+                              textDecoration: 'none'
+                            }}
+                          >
+                            <Eye size={13} /> {v.status === 'COMPLETED' ? 'View Report' : ['PENDING', 'RUNNING'].includes(v.status) ? 'Checking...' : 'View Details'}
+                          </Link>
+                          <button
+                            className="btn-danger"
+                            style={{
+                              padding: '6px 8px',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center'
+                            }}
                             onClick={() => handleDelete(v.id)}
                           >
                             <Trash2 size={14} />
@@ -561,37 +684,53 @@ export default function ValidationPage() {
       </div>
 
       {/* Directory Browser Modal */}
-      {isBrowserOpen && (browserTarget === 's3' ? getSelectedCustomer() : getSelectedSource()) && (
+      {isBrowserOpen && (browserType === 's3' ? getSelectedCustomer() : getSelectedSource()) && (
         <FolderBrowser
           isOpen={isBrowserOpen}
           onClose={() => setIsBrowserOpen(false)}
           onSelect={(selectedPath) => {
-            if (browserTarget === 'gdrive') {
+            const isSource = browserTarget === 'source';
+            const isGDrive = isSource ? formData.sourceType === 'GDrive' : formData.destType === 'GDrive';
+
+            if (isGDrive) {
               const cleanPath = selectedPath.replace(/^\//, '').replace(/\/+$/, '');
               const drivePath = getSelectedSource()?.drivePath?.replace(/^\//, '').replace(/\/+$/, '') || '';
               
               if (drivePath && (cleanPath === drivePath || cleanPath.startsWith(drivePath + '/'))) {
                 const relativePath = cleanPath === drivePath ? '' : cleanPath.substring(drivePath.length + 1);
-                setFormData({ ...formData, sourcePath: relativePath });
+                if (isSource) {
+                  setFormData({ ...formData, sourcePath: relativePath });
+                } else {
+                  setFormData({ ...formData, destinationPath: relativePath });
+                }
               } else {
-                setFormData({ ...formData, sourcePath: cleanPath });
+                if (isSource) {
+                  setFormData({ ...formData, sourcePath: cleanPath });
+                } else {
+                  setFormData({ ...formData, destinationPath: cleanPath });
+                }
               }
             } else {
-              setFormData({ ...formData, destinationPath: selectedPath });
+              if (isSource) {
+                setFormData({ ...formData, sourcePath: selectedPath });
+              } else {
+                setFormData({ ...formData, destinationPath: selectedPath });
+              }
             }
           }}
-          type={browserTarget}
+          type={browserType}
           initialPath={
-            browserTarget === 'gdrive'
+            browserType === 'gdrive'
               ? (() => {
                   const drivePath = getSelectedSource()?.drivePath?.replace(/^\//, '').replace(/\/+$/, '') || '';
-                  const startPath = formData.sourcePath.replace(/^\//, '').replace(/\/+$/, '');
+                  const rawPath = browserTarget === 'source' ? formData.sourcePath : formData.destinationPath;
+                  const startPath = rawPath.replace(/^\//, '').replace(/\/+$/, '');
                   return drivePath ? (startPath ? `${drivePath}/${startPath}` : drivePath) : startPath;
                 })()
-              : formData.destinationPath
+              : (browserTarget === 'source' ? formData.sourcePath : formData.destinationPath)
           }
           s3Params={
-            browserTarget === 's3' && getSelectedCustomer()
+            browserType === 's3' && getSelectedCustomer()
               ? {
                   roleArn: getSelectedCustomer().roleArn,
                   bucketName: getSelectedCustomer().bucketName,
@@ -600,8 +739,8 @@ export default function ValidationPage() {
                 }
               : undefined
           }
-          gdriveAuthType={browserTarget === 'gdrive' && getSelectedSource() ? getSelectedSource().authType : undefined}
-          sharedDriveId={browserTarget === 'gdrive' && getSelectedSource()?.driveType === 'SHARED_DRIVE' ? getSelectedSource().sharedDriveId : undefined}
+          gdriveAuthType={browserType === 'gdrive' && getSelectedSource() ? getSelectedSource().authType : undefined}
+          sharedDriveId={browserType === 'gdrive' && getSelectedSource()?.driveType === 'SHARED_DRIVE' ? getSelectedSource().sharedDriveId : undefined}
         />
       )}
     </div>

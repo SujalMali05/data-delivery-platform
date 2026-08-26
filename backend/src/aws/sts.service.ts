@@ -19,7 +19,10 @@ export class StsService {
     const accessKeyId = configService.get<string>('AWS_ACCESS_KEY_ID');
     const secretAccessKey = configService.get<string>('AWS_SECRET_ACCESS_KEY');
 
-    const clientConfig: any = { region };
+    const clientConfig: any = {
+      region,
+      maxAttempts: 5,
+    };
 
     if (accessKeyId && secretAccessKey) {
       clientConfig.credentials = {

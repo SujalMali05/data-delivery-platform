@@ -7,6 +7,10 @@ export class CreateValidationDto {
 
   @IsString()
   @IsNotEmpty()
+  sourceType: string; // 'GDrive' | 'S3'
+
+  @IsString()
+  @IsNotEmpty()
   sourceId: string;
 
   @IsString()
@@ -15,7 +19,11 @@ export class CreateValidationDto {
 
   @IsString()
   @IsNotEmpty()
-  customerId: string;
+  destType: string; // 'GDrive' | 'S3'
+
+  @IsString()
+  @IsNotEmpty()
+  destId: string;
 
   @IsString()
   @IsOptional()
@@ -24,4 +32,8 @@ export class CreateValidationDto {
   @IsBoolean()
   @IsOptional()
   oneWay?: boolean;
+
+  @IsBoolean()
+  @IsOptional()
+  ignoreExtension?: boolean;
 }

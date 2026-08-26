@@ -19,6 +19,7 @@ import { LogsModule } from './logs/logs.module';
 import { DashboardModule } from './dashboard/dashboard.module';
 import { ValidationModule } from './validation/validation.module';
 import { WavCalculationModule } from './wav-calculation/wav-calculation.module';
+import { BatchOperationsModule } from './batch-operations/batch-operations.module';
 
 @Module({
   imports: [
@@ -69,6 +70,7 @@ import { WavCalculationModule } from './wav-calculation/wav-calculation.module';
     DashboardModule,
     ValidationModule,
     WavCalculationModule,
+    BatchOperationsModule,
   ],
 })
 export class AppModule {}

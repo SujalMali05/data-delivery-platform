@@ -24,6 +24,7 @@ frontend/.env.local
 # ── Sensitive rclone Config & Credentials ──────────────────
 # MUST NOT BE COMMITTED TO GITHUB!
 rclone-config/rclone.conf
+rclone-config/rclone.conf*
 rclone-config/service-account.json
 # Allow other config-related files like gitkeep to stay
 !rclone-config/.gitkeep
@@ -31,9 +32,13 @@ rclone-config/service-account.json
 # ── Scratch/Temporary Testing Scripts ──────────────────────
 # Scratch files might contain active OAuth tokens or keys
 scratch*.ts
+scratch*.js
 backend/scratch*.ts
+backend/scratch*.js
 scratch/
 backend/scratch/
+backend/reports/
+query
 
 # ── Logs & Reports ────────────────────────────────────────
 *.log

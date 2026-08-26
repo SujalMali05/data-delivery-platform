@@ -19,6 +19,8 @@ import {
   Moon,
   FileCheck,
   Volume2,
+  Trash2,
+  Boxes,
 } from 'lucide-react';
 import { getSavedThemeSettings, saveThemeSettings } from '../../lib/theme';
 
@@ -41,6 +43,7 @@ const navItems = [
       { href: '/dashboard/audio-analyzer', label: 'Audio Analyzer', icon: Volume2 },
       { href: '/dashboard/s3-browser', label: 'S3 Browser', icon: Database },
       { href: '/dashboard/validation', label: 'Folder Validation', icon: FileCheck },
+      { href: '/dashboard/batch-operations', label: 'Batch Operations', icon: Boxes },
       { href: '/dashboard/schedules', label: 'Schedules', icon: CalendarClock },
       { href: '/dashboard/logs', label: 'Logs', icon: ScrollText },
       { href: '/dashboard/settings', label: 'Settings', icon: Settings },

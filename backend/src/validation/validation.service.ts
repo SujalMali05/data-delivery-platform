@@ -86,11 +86,16 @@ export class ValidationService {
     const validation = await this.prisma.validation.create({
       data: {
         name: finalName,
-        sourceId: dto.sourceId,
+        sourceType: dto.sourceType,
         sourcePath: dto.sourcePath || '',
-        customerId: dto.customerId,
+        destType: dto.destType,
         destinationPath: dto.destinationPath || '',
         oneWay: dto.oneWay ?? false,
+        ignoreExtension: dto.ignoreExtension ?? false,
+        sourceGDriveId: dto.sourceType === 'GDrive' ? dto.sourceId : null,
+        sourceCustomerId: dto.sourceType === 'S3' ? dto.sourceId : null,
+        destGDriveId: dto.destType === 'GDrive' ? dto.destId : null,
+        destCustomerId: dto.destType === 'S3' ? dto.destId : null,
         status: 'PENDING',
       },
     });
@@ -109,10 +114,16 @@ export class ValidationService {
   async findAll() {
     return this.prisma.validation.findMany({
       include: {
-        source: {
+        sourceGDrive: {
           select: { name: true, drivePath: true },
         },
-        customer: {
+        sourceCustomer: {
+          select: { name: true, bucketName: true },
+        },
+        destGDrive: {
+          select: { name: true, drivePath: true },
+        },
+        destCustomer: {
           select: { name: true, bucketName: true },
         },
       },
@@ -126,8 +137,10 @@ export class ValidationService {
     const validation = await this.prisma.validation.findUnique({
       where: { id },
       include: {
-        source: true,
-        customer: true,
+        sourceGDrive: true,
+        sourceCustomer: true,
+        destGDrive: true,
+        destCustomer: true,
       },
     });
 

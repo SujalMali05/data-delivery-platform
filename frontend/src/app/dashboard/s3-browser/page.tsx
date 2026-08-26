@@ -45,8 +45,11 @@ export default function S3BrowserPage() {
   const [page, setPage] = useState<number>(1);
   const [limit, setLimit] = useState<number>(50);
   const [filterText, setFilterText] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   // Sorting state
+  const [sortBy, setSortBy] = useState<'name' | 'date'>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
   // Download tracking state
@@ -64,7 +67,7 @@ export default function S3BrowserPage() {
       });
   }, []);
 
-  // Fetch objects when customer, path, page, limit, or sortDir changes
+  // Fetch objects when customer, path, page, limit, or sort parameters change
   useEffect(() => {
     if (!selectedCustomerId) {
       setItems([]);
@@ -72,7 +75,7 @@ export default function S3BrowserPage() {
       return;
     }
     fetchObjects();
-  }, [selectedCustomerId, path, page, limit, sortDir]);
+  }, [selectedCustomerId, path, page, limit, sortDir, startDate, endDate, sortBy]);
 
   const fetchObjects = async () => {
     setLoading(true);
@@ -84,6 +87,9 @@ export default function S3BrowserPage() {
         page,
         limit,
         sortDir,
+        startDate,
+        endDate,
+        sortBy,
       });
       setItems(response.data.items || []);
       setTotal(response.data.total || 0);
@@ -122,9 +128,14 @@ export default function S3BrowserPage() {
     setPage(1); // Reset page to 1 on path change
   };
 
-  const handleSortToggle = () => {
-    setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
-    setPage(1); // Reset page to 1
+  const handleSort = (field: 'name' | 'date') => {
+    if (sortBy === field) {
+      setSortDir((prev) => (prev === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortBy(field);
+      setSortDir(field === 'date' ? 'desc' : 'asc');
+    }
+    setPage(1);
   };
 
   const handleNavigateUp = () => {
@@ -174,7 +185,7 @@ export default function S3BrowserPage() {
     }
   };
 
-  // Filter items locally by search query
+  // Filter items locally by search query only (date filtering is handled server-side)
   const filteredItems = items.filter((item) =>
     item.name.toLowerCase().includes(filterText.toLowerCase())
   );
@@ -209,6 +220,10 @@ export default function S3BrowserPage() {
               setPath('');
               setPage(1);
               setFilterText('');
+              setStartDate('');
+              setEndDate('');
+              setSortBy('name');
+              setSortDir('asc');
             }}
             style={{ maxWidth: '320px', margin: 0 }}
           >
@@ -222,16 +237,63 @@ export default function S3BrowserPage() {
         </div>
 
         {selectedCustomerId && (
-          <div style={{ position: 'relative', width: '260px' }}>
-            <input
-              className="input"
-              type="text"
-              placeholder="Search current folder..."
-              value={filterText}
-              onChange={(e) => setFilterText(e.target.value)}
-              style={{ paddingLeft: '36px', margin: 0, fontSize: '13px' }}
-            />
-            <Search size={16} color="var(--text-tertiary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', alignItems: 'center' }}>
+            {/* Date Range Picker Controls */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid var(--border-primary)', padding: '4px 12px', borderRadius: '8px' }}>
+              <span style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>Upload Date:</span>
+              <input
+                key="s3-start-date-input"
+                type="date"
+                value={startDate}
+                onChange={(e) => {
+                  setStartDate(e.target.value);
+                  setPage(1);
+                }}
+                className="input"
+                style={{ padding: '4px 8px', fontSize: '12px', width: '135px', margin: 0, height: '32px' }}
+                title="Start Date"
+              />
+              <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>to</span>
+              <input
+                key="s3-end-date-input"
+                type="date"
+                value={endDate}
+                onChange={(e) => {
+                  setEndDate(e.target.value);
+                  setPage(1);
+                }}
+                className="input"
+                style={{ padding: '4px 8px', fontSize: '12px', width: '135px', margin: 0, height: '32px' }}
+                title="End Date"
+              />
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStartDate('');
+                    setEndDate('');
+                    setPage(1);
+                  }}
+                  style={{ background: 'transparent', border: 'none', color: 'var(--accent-red)', cursor: 'pointer', padding: '0 4px', fontSize: '12px', fontWeight: 600 }}
+                  title="Clear Date Filters"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+
+            {/* Local Search Input */}
+            <div style={{ position: 'relative', width: '220px' }}>
+              <input
+                className="input"
+                type="text"
+                placeholder="Search current folder..."
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                style={{ paddingLeft: '32px', margin: 0, fontSize: '12px', height: '32px' }}
+              />
+              <Search size={14} color="var(--text-tertiary)" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)' }} />
+            </div>
           </div>
         )}
       </div>
@@ -324,7 +386,7 @@ export default function S3BrowserPage() {
                 <thead>
                   <tr style={{ textAlign: 'left', borderBottom: '1px solid var(--border-secondary)', background: 'rgba(255,255,255,0.01)' }}>
                     <th 
-                      onClick={handleSortToggle}
+                      onClick={() => handleSort('name')}
                       style={{ 
                         padding: '12px 20px', 
                         fontWeight: 600, 
@@ -336,13 +398,35 @@ export default function S3BrowserPage() {
                     >
                       <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         <span>Name</span>
-                        <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--accent-blue)', transition: 'transform 0.2s' }}>
-                          {sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-                        </span>
+                        {sortBy === 'name' && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--accent-blue)', transition: 'transform 0.2s' }}>
+                            {sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                          </span>
+                        )}
                       </div>
                     </th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px' }}>Size</th>
-                    <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '200px' }}>Last Modified</th>
+                    <th 
+                      onClick={() => handleSort('date')}
+                      style={{ 
+                        padding: '12px 20px', 
+                        fontWeight: 600, 
+                        color: 'var(--text-tertiary)',
+                        cursor: 'pointer',
+                        userSelect: 'none',
+                        width: '200px'
+                      }}
+                      title={`Sort by Date/Time ${sortDir === 'asc' ? 'Descending' : 'Ascending'}`}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <span>Last Modified</span>
+                        {sortBy === 'date' && (
+                          <span style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--accent-blue)', transition: 'transform 0.2s' }}>
+                            {sortDir === 'asc' ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+                          </span>
+                        )}
+                      </div>
+                    </th>
                     <th style={{ padding: '12px 20px', fontWeight: 600, color: 'var(--text-tertiary)', width: '120px', textAlign: 'right' }}>Actions</th>
                   </tr>
                 </thead>

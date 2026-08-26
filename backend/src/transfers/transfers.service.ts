@@ -106,7 +106,7 @@ export class TransfersService implements OnApplicationBootstrap {
     const limit = filters?.limit || 20;
     const skip = (page - 1) * limit;
 
-    const where: any = {};
+    const where: any = { isBatch: false };
     if (filters?.status) {
       where.status = filters.status;
     }

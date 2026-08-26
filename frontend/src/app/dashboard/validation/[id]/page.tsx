@@ -29,7 +29,7 @@ interface ReportDetails {
   name: string;
   oneWay: boolean;
   source: { name: string; path: string };
-  destination: { customer: string; bucket: string; path: string };
+  destination: { customer?: string; name?: string; bucket?: string; path: string };
   summary: {
     srcTotalBytes: string;
     srcTotalFiles: number;
@@ -85,13 +85,19 @@ export default function ValidationReportPage() {
   const handleRevalidate = async () => {
     setRevalidateLoading(true);
     try {
+      const sourceId = metadata.sourceType === 'GDrive' ? metadata.sourceGDriveId : metadata.sourceCustomerId;
+      const destId = metadata.destType === 'GDrive' ? metadata.destGDriveId : metadata.destCustomerId;
+
       const res = await validationApi.create({
         name: metadata.name,
-        sourceId: metadata.sourceId,
+        sourceType: metadata.sourceType,
+        sourceId: sourceId,
         sourcePath: metadata.sourcePath,
-        customerId: metadata.customerId,
+        destType: metadata.destType,
+        destId: destId,
         destinationPath: metadata.destinationPath,
         oneWay: metadata.oneWay,
+        ignoreExtension: metadata.ignoreExtension,
       });
       alert('New validation run triggered successfully! Redirecting to new report page.');
       router.push(`/dashboard/validation/${res.data.id}`);
@@ -118,7 +124,7 @@ export default function ValidationReportPage() {
 
     try {
       await gdriveApi.dedupe({
-        sourceId: metadata.sourceId,
+        sourceId: metadata.sourceGDriveId || '',
         path: metadata.sourcePath,
         mode: dedupeMode,
       });
@@ -136,6 +142,7 @@ export default function ValidationReportPage() {
       console.error('Failed to deduplicate:', err);
       setDedupeError(err.response?.data?.message || 'Failed to complete deduplication.');
     } finally {
+      setIsDedupeModalOpen(false); // Make sure it closes on error or finally
       setDedupeLoading(false);
     }
   };
@@ -207,6 +214,38 @@ export default function ValidationReportPage() {
     const link = document.createElement('a');
     link.href = url;
     link.download = `validation-report-${report.name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${id.slice(0, 8)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDownloadCsv = () => {
+    if (filteredList.length === 0) return;
+    
+    // Convert filtered list items to array of strings (path names)
+    const paths = filteredList.map(item => {
+      if (typeof item === 'object' && item !== null && 'path' in item) {
+        return (item as any).path;
+      }
+      return String(item);
+    });
+
+    // Generate CSV content with one column
+    const csvHeader = 'File Path\n';
+    const csvBody = paths.map(path => {
+      const escaped = path.replace(/"/g, '""');
+      return `"${escaped}"`;
+    }).join('\n');
+
+    const csvContent = csvHeader + csvBody;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    const tabName = activeTab.replace(/([A-Z])/g, '-$1').toLowerCase();
+    link.download = `validation-${tabName}-list-${id.slice(0, 8)}.csv`;
+    
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -292,10 +331,10 @@ export default function ValidationReportPage() {
   const isRunning = ['PENDING', 'RUNNING'].includes(metadata?.status || '');
   const isFailed = metadata?.status === 'FAILED';
 
-  const sourceName = report?.source?.name || metadata?.source?.name || '';
+  const sourceName = report?.source?.name || (metadata?.sourceType === 'GDrive' ? metadata?.sourceGDrive?.name : metadata?.sourceCustomer?.name) || '';
   const sourcePath = report?.source?.path || metadata?.sourcePath || '';
-  const destinationCustomer = report?.destination?.customer || metadata?.customer?.name || '';
-  const destinationBucket = report?.destination?.bucket || metadata?.customer?.bucketName || '';
+  const destinationCustomer = report?.destination?.customer || report?.destination?.name || (metadata?.destType === 'GDrive' ? metadata?.destGDrive?.name : metadata?.destCustomer?.name) || '';
+  const destinationBucket = report?.destination?.bucket || (metadata?.destType === 'S3' ? metadata?.destCustomer?.bucketName : '') || '';
   const destinationPath = report?.destination?.path || metadata?.destinationPath || '';
   const oneWay = report ? report.oneWay : (metadata ? metadata.oneWay : false);
 
@@ -321,15 +360,18 @@ export default function ValidationReportPage() {
     Number(srcTotalBytes) === Number(dstTotalBytes);
 
   const getTabLabel = (tab: typeof activeTab) => {
+    const srcLabel = metadata?.sourceType === 'GDrive' ? 'Drive' : 'S3';
+    const destLabel = metadata?.destType === 'GDrive' ? 'Drive' : 'S3';
+
     switch (tab) {
       case 'match':
         return `Matched (${matchCount})`;
       case 'differ':
         return `Differing (${differCount})`;
       case 'missingOnDst':
-        return `Missing on S3 (${missingDstCount})`;
+        return `Missing on ${destLabel} (${missingDstCount})`;
       case 'missingOnSrc':
-        return `Missing on Drive (${missingSrcCount})`;
+        return `Missing on ${srcLabel} (${missingSrcCount})`;
       case 'error':
         return `Errors (${errorCount})`;
       case 'duplicates':
@@ -419,9 +461,11 @@ export default function ValidationReportPage() {
       {/* Directory Paths Mapping */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
         <div className="card" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 600 }}>Google Drive Source</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+            {metadata?.sourceType === 'GDrive' ? 'Google Drive Source' : 'Amazon S3 Source'}
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '13px', color: 'var(--text-primary)' }}>
-            <HardDrive size={16} color="var(--accent-blue)" />
+            {metadata?.sourceType === 'GDrive' ? <HardDrive size={16} color="var(--accent-blue)" /> : <Database size={16} color="var(--accent-blue)" />}
             <strong>{sourceName}</strong>
           </div>
           <div style={{ fontFamily: 'monospace', fontSize: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', marginTop: '8px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
@@ -430,10 +474,12 @@ export default function ValidationReportPage() {
         </div>
 
         <div className="card" style={{ padding: '16px 20px' }}>
-          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 600 }}>Customer S3 Destination</span>
+          <span style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+            {metadata?.destType === 'GDrive' ? 'Google Drive Destination' : 'Amazon S3 Destination'}
+          </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '6px', fontSize: '13px', color: 'var(--text-primary)' }}>
-            <Database size={16} color="var(--accent-blue)" />
-            <strong>{destinationCustomer} ({destinationBucket})</strong>
+            {metadata?.destType === 'GDrive' ? <HardDrive size={16} color="var(--accent-blue)" /> : <Database size={16} color="var(--accent-blue)" />}
+            <strong>{destinationCustomer} {destinationBucket ? `(${destinationBucket})` : ''}</strong>
           </div>
           <div style={{ fontFamily: 'monospace', fontSize: '12px', background: 'rgba(255,255,255,0.02)', padding: '8px 12px', borderRadius: '6px', marginTop: '8px', color: 'var(--text-secondary)', wordBreak: 'break-all' }}>
             {destinationPath || '/ (Root)'}
@@ -628,8 +674,28 @@ export default function ValidationReportPage() {
               <Search size={16} color="var(--text-tertiary)" style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)' }} />
             </div>
             
-            <div style={{ fontSize: '12px', color: 'var(--text-muted)', flex: 1, textAlign: 'right' }}>
-              Showing {filteredList.length === totalItems ? totalItems : `${filteredList.length} of ${totalItems}`} items
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {filteredList.length > 0 && (
+                <button
+                  className="btn-secondary"
+                  onClick={handleDownloadCsv}
+                  style={{
+                    padding: '6px 12px',
+                    fontSize: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    border: '1px solid var(--accent-emerald)',
+                    color: 'var(--accent-emerald)',
+                    background: 'rgba(16, 185, 129, 0.05)',
+                  }}
+                >
+                  <Download size={14} /> Download CSV
+                </button>
+              )}
+              <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                Showing {filteredList.length === totalItems ? totalItems : `${filteredList.length} of ${totalItems}`} items
+              </div>
             </div>
           </div>
 

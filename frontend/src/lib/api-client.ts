@@ -64,7 +64,7 @@ export const customersApi = {
     apiClient.post('/customers/browse', data),
   size: (data: { roleArn: string; bucketName: string; region: string; externalId?: string; path?: string }) =>
     apiClient.post('/customers/size', data),
-  listObjects: (data: { customerId: string; path?: string; page?: number; limit?: number; sortDir?: 'asc' | 'desc' }) =>
+  listObjects: (data: { customerId: string; path?: string; page?: number; limit?: number; sortDir?: 'asc' | 'desc'; startDate?: string; endDate?: string; sortBy?: 'name' | 'date' }) =>
     apiClient.post('/customers/list-objects', data),
   downloadObject: (customerId: string, path: string) =>
     apiClient.post('/customers/download-object', { customerId, path }, { responseType: 'blob' }),
@@ -124,9 +124,78 @@ export const validationApi = {
   list: () => apiClient.get('/validation'),
   get: (id: string) => apiClient.get(`/validation/${id}`),
   getReport: (id: string) => apiClient.get(`/validation/${id}/report`),
-  create: (data: { name: string; sourceId: string; sourcePath?: string; customerId: string; destinationPath?: string; oneWay?: boolean }) =>
+  create: (data: {
+    name: string;
+    sourceType: string;
+    sourceId: string;
+    sourcePath?: string;
+    destType: string;
+    destId: string;
+    destinationPath?: string;
+    oneWay?: boolean;
+    ignoreExtension?: boolean;
+  }) =>
     apiClient.post('/validation', data),
   delete: (id: string) => apiClient.delete(`/validation/${id}`),
+};
+
+// Batch Operations
+export const batchOperationsApi = {
+  runDelete: (data: {
+    storageType: 'GDrive' | 'S3';
+    storageId: string;
+    path?: string;
+    csvContent?: string;
+    paths?: string[];
+  }) => apiClient.post('/batch-operations/delete', data),
+  analyzeDelete: (data: {
+    storageType: 'GDrive' | 'S3';
+    storageId: string;
+    path?: string;
+    csvContent: string;
+    ignoreExtension?: boolean;
+  }) => apiClient.post('/batch-operations/delete/analyze', data),
+  runCopy: (data: {
+    sourceType: 'GDrive' | 'S3';
+    sourceId: string;
+    sourcePath?: string;
+    destType: 'GDrive' | 'S3';
+    destId: string;
+    destinationPath?: string;
+    csvContent?: string;
+    paths?: string[];
+  }) => apiClient.post('/batch-operations/copy', data),
+  analyzeCopy: (data: {
+    sourceType: 'GDrive' | 'S3';
+    sourceId: string;
+    sourcePath?: string;
+    csvContent: string;
+    ignoreExtension?: boolean;
+  }) => apiClient.post('/batch-operations/copy/analyze', data),
+  analyzeCopyAllObjects: (data: {
+    sourceType: 'GDrive' | 'S3';
+    sourceId: string;
+    sourcePath?: string;
+  }) => apiClient.post('/batch-operations/copy/analyze-all', data),
+  analyzeCopySync: (data: {
+    sourceType: 'GDrive' | 'S3';
+    sourceId: string;
+    sourcePath?: string;
+    destType: 'GDrive' | 'S3';
+    destId: string;
+    destinationPath?: string;
+    ignoreExtension?: boolean;
+  }) => apiClient.post('/batch-operations/copy/analyze-sync', data),
+  runCopySync: (data: {
+    sourceType: 'GDrive' | 'S3';
+    sourceId: string;
+    sourcePath?: string;
+    destType: 'GDrive' | 'S3';
+    destId: string;
+    destinationPath?: string;
+    toCopy: string[];
+    toDelete: string[];
+  }) => apiClient.post('/batch-operations/copy/sync', data),
 };
 
 // WAV Calculations History

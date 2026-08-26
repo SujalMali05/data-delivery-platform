@@ -49,7 +49,8 @@ model Customer {
   updatedAt     DateTime  @updatedAt @map("updated_at")
 
   transfers Transfer[]
-  validations Validation[]
+  validationSources Validation[] @relation("ValidationSourceCustomer")
+  validationDests   Validation[] @relation("ValidationDestCustomer")
 
   @@map("customers")
 }
@@ -71,7 +72,8 @@ model GoogleDriveSource {
   updatedAt     DateTime        @updatedAt @map("updated_at")
 
   transfers Transfer[]
-  validations Validation[]
+  validationSources Validation[] @relation("ValidationSourceGDrive")
+  validationDests   Validation[] @relation("ValidationDestGDrive")
 
   @@map("google_drive_sources")
 }
@@ -121,6 +123,7 @@ model Transfer {
   skipDeletion   Boolean @default(false) @map("skip_deletion")
   dryRunReport   Json?   @map("dry_run_report")
   selectedItems  Json?   @map("selected_items")
+  isBatch        Boolean @default(false) @map("is_batch")
 
   // Progress Tracking
   totalBytes       BigInt @default(0) @map("total_bytes")
@@ -271,16 +274,24 @@ model Validation {
   name            String
   status          ValidationStatus @default(PENDING)
   oneWay          Boolean          @default(false) @map("one_way")
+  ignoreExtension Boolean          @default(false) @map("ignore_extension")
 
-  // Source (Google Drive)
-  sourceId        String            @map("source_id")
-  source          GoogleDriveSource @relation(fields: [sourceId], references: [id])
-  sourcePath      String            @map("source_path")
+  // Source configuration
+  sourceType       String            @default("GDrive") @map("source_type") // "GDrive" or "S3"
+  sourcePath       String            @map("source_path")
+  sourceGDriveId   String?           @map("source_gdrive_id")
+  sourceGDrive     GoogleDriveSource? @relation("ValidationSourceGDrive", fields: [sourceGDriveId], references: [id], onDelete: SetNull)
+  sourceCustomerId String?           @map("source_customer_id")
+  sourceCustomer   Customer?         @relation("ValidationSourceCustomer", fields: [sourceCustomerId], references: [id], onDelete: SetNull)
 
-  // Destination (S3 Customer)
-  customerId      String            @map("customer_id")
-  customer        Customer          @relation(fields: [customerId], references: [id])
-  destinationPath String            @map("destination_path")
+  // Destination configuration
+  destType         String            @default("S3") @map("dest_type")     // "GDrive" or "S3"
+  destinationPath  String            @map("destination_path")
+  destGDriveId     String?           @map("dest_gdrive_id")
+  destGDrive       GoogleDriveSource? @relation("ValidationDestGDrive", fields: [destGDriveId], references: [id], onDelete: SetNull)
+  destCustomerId   String?           @map("dest_customer_id")
+  destCustomer     Customer?         @relation("ValidationDestCustomer", fields: [destCustomerId], references: [id], onDelete: SetNull)
+
 
   // Sizing summaries
   srcTotalBytes   BigInt            @default(0) @map("src_total_bytes")

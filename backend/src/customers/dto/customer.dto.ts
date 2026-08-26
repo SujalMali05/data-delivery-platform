@@ -56,3 +56,35 @@ export class UpdateCustomerDto {
   @IsOptional()
   externalId?: string;
 }
+
+export class ListObjectsDto {
+  @IsString()
+  @IsNotEmpty()
+  customerId: string;
+
+  @IsString()
+  @IsOptional()
+  path?: string;
+
+  @IsOptional()
+  page?: number;
+
+  @IsOptional()
+  limit?: number;
+
+  @IsString()
+  @IsOptional()
+  sortDir?: 'asc' | 'desc';
+
+  @IsString()
+  @IsOptional()
+  startDate?: string;
+
+  @IsString()
+  @IsOptional()
+  endDate?: string;
+
+  @IsString()
+  @IsOptional()
+  sortBy?: 'name' | 'date';
+}
